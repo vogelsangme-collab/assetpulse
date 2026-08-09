@@ -1,2 +1,0 @@
-# assetpulse
-progressive asset managment
