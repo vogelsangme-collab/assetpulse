@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AssetPulse PAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; background: #f5f3ee; color: #1c1917;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 32px 24px;
+  }
+  .wrap { width: 100%; max-width: 520px; }
+  .eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #78716c; }
+  h1 { font-family: Newsreader, Georgia, serif; font-weight: 500; font-size: 40px; line-height: 1.05; margin: 12px 0 0; }
+  .sub { font-size: 15px; line-height: 1.55; color: #57534e; margin-top: 12px; }
+  .apps { display: flex; flex-direction: column; gap: 14px; margin-top: 34px; }
+  a.app {
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid #d9d5cb; background: #fffdf8; padding: 22px 24px;
+    transition: border-color .12s, transform .12s;
+  }
+  a.app:hover { border-color: #1c1917; transform: translateY(-1px); }
+  a.app .name { font-family: Newsreader, Georgia, serif; font-size: 24px; font-weight: 500; }
+  a.app .who { font-size: 13.5px; line-height: 1.5; color: #57534e; margin-top: 6px; }
+  a.app .go { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #9a3412; margin-top: 14px; }
+  footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid #d9d5cb; font-size: 12.5px; line-height: 1.6; color: #78716c; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow">Vogelsang &middot; Progressive asset management</div>
+    <h1>AssetPulse PAM</h1>
+    <p class="sub">Two applications share one survey record. Open the one that matches your role.</p>
+
+    <div class="apps">
+      <a class="app" href="field.html">
+        <div class="name">Field app</div>
+        <div class="who">For engineers on site. Record a visit, capture assets and photos, publish the report.</div>
+        <div class="go">Open field app &rarr;</div>
+      </a>
+      <a class="app" href="admin.html">
+        <div class="name">Admin console</div>
+        <div class="who">For the back office. Reports, coverage dashboard, site map and reference lists.</div>
+        <div class="go">Open admin console &rarr;</div>
+      </a>
+    </div>
+
+    <footer>Test build. Report problems to the project owner rather than to customers.</footer>
+  </div>
+</body>
+</html>
