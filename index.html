@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>AssetPulse OCR Bench</title>
+<style>
+  :root { --ink:#1c1917; --mut:#6b645a; --line:#e7e2da; --bg:#efece5; --card:#faf8f4; --amb:#d97706; --ok:#15803d; --chk:#b45309; --bad:#b91c1c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { padding: max(12px, env(safe-area-inset-top)) 12px 40px; }
+  .wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font-size: 19px; margin: 4px 0 0; }
+  .sub { color: var(--mut); font-size: 12.5px; }
+  .card { background: var(--card); border: 1px solid #d6d0c6; border-radius: 14px; padding: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, .btn { appearance: none; border: 1px solid var(--ink); background: #fff; color: var(--ink); border-radius: 10px; min-height: 46px; padding: 0 14px; font: inherit; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  button.pri { background: var(--ink); color: #fff; }
+  button.amb { background: var(--amb); border-color: var(--amb); color: var(--ink); }
+  button:disabled { opacity: .45; }
+  .grow { flex: 1 1 140px; }
+  .tip { font-size: 12.5px; color: var(--mut); margin-top: 8px; }
+  canvas { max-width: 100%; display: block; border-radius: 8px; background: #2a2622; touch-action: none; }
+  #cropCv { width: 100%; }
+  .bar { height: 8px; background: #e7e2da; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--amb); transition: width .2s; }
+  #status { margin-top: 8px; font-weight: 600; min-height: 1.4em; }
+  #err { color: var(--bad); font-weight: 600; white-space: pre-wrap; }
+  .field { border-top: 1px solid var(--line); padding: 10px 0; }
+  .field:first-child { border-top: 0; padding-top: 0; }
+  .fhead { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .fname { font-weight: 700; }
+  .badge { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; white-space: nowrap; }
+  .b-ok { background: var(--ok); } .b-check { background: var(--chk); } .b-none { background: #78716c; }
+  input[type=text], select { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #d6d0c6; border-radius: 9px; font: inherit; font-size: 16px; background: #fff; color: var(--ink); margin-top: 6px; }
+  .reason { font-size: 12.5px; color: var(--mut); margin-top: 4px; }
+  .alts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .alts button { min-height: 32px; font-size: 13px; padding: 0 10px; border-radius: 8px; border-color: #d6d0c6; font-weight: 500; }
+  .verdict { display: flex; gap: 6px; margin-top: 6px; align-items: center; font-size: 12.5px; color: var(--mut); }
+  .verdict button { min-height: 32px; padding: 0 12px; font-size: 13px; border-color: #d6d0c6; }
+  .verdict button.on-y { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .verdict button.on-n { background: var(--bad); color: #fff; border-color: var(--bad); }
+  pre { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; margin: 0; max-height: 340px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 5px 4px; border-top: 1px solid var(--line); vertical-align: top; }
+  td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  details summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+  label.opt { display: flex; gap: 8px; align-items: center; margin: 8px 0; font-size: 14px; }
+  .legend { font-size: 12px; color: var(--mut); margin-top: 6px; }
+  .legend b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 3px 0 8px; vertical-align: -1px; }
+  .form .fv { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-top: 8px; }
+  .form .fv span { font-size: 13.5px; color: var(--mut); }
+  .qrtag { font-weight: 600; color: #16a34a; font-size: 12px; }
+  .npRow { display: flex; gap: 10px; }
+  .npBtn { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; justify-content: center; min-height: 54px; padding: 0 8px; background: #d97706; color: #1c1917; border: 0; border-radius: 10px; font: inherit; font-weight: 600; font-size: 13px; text-align: center; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .npBtn:hover { filter: brightness(.94); } .npBtn:disabled { opacity: .45; }
+  .npHide { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+  #npPanel { margin-top: 10px; border: 1px solid #e7e2da; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+  #npPanel.bad { border-color: #fca5a5; }
+  #npImg { width: 100%; max-height: 220px; object-fit: contain; border-radius: 8px; background: #f0ede6; }
+  #npHead { font-size: 13px; font-weight: 700; line-height: 1.35; }
+  #npRows div { font-size: 12.5px; line-height: 1.4; }
+  .npFoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: #6b645a; }
+  .npRep { flex: none; position: relative; font-size: 12px; font-weight: 700; color: #d97706; cursor: pointer; white-space: nowrap; }
+  .form .fv input.unsure, .form .fv select.unsure { background: #fff7cc; border-color: #b91c1c; border-width: 2px; }
+  .hide { display: none !important; }
+  body.lean .card:not(#cScanCard):not(#cForm), body.lean .sub { display: none !important; }
+  body.embed > *:not(#scanner):not(script) { display: none !important; } body.embed { background: #000 !important; }
+  body.lean #cScanCard .tip, body.lean #dFallback { display: none !important; }
+  .form .fv input.filled, .form .fv select.filled { background: #ecfdf3; border-color: #15803d; }
+  body:not(.marking) .verdict { display: none; }
+  .field.f-check input, .field.f-check select { background: #fff4d6; border-color: #d97706; border-width: 2px; }
+  .field.f-none input, .field.f-none select { background: #fff; border-color: #b91c1c; border-style: dashed; }
+  #scanner { position: fixed; inset: 0; background: #000; z-index: 50; }
+  #scanVid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  #scanView { display: none; }
+  #scanCv { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent !important; border-radius: 0; }  /* must be see-through: the camera is underneath */
+  #scanBar { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 16px max(18px, env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center; justify-content: center; }
+  #scanBar button { min-height: 52px; border-radius: 26px; }
+  #scanBar #bShot { width: 76px; height: 76px; border-radius: 50%; background: #fff; border: 5px solid #d97706; font-size: 0; }
+  #scanTip { position: absolute; left: 12px; right: 12px; top: max(12px, env(safe-area-inset-top)); color: #fff; text-align: center; font-weight: 600; text-shadow: 0 1px 3px #000; }
+  .seg { display: flex; border: 1px solid var(--ink); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+  .seg button { flex: 1; border: 0; border-radius: 0; min-height: 42px; background: #fff; }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 9; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>AssetPulse · Nameplate scan</h1>
+    <div class="sub">Test tool only — not connected to AssetPulse. Photos and text stay on this phone; nothing is uploaded. Build 2026-11-07.1636-S.</div>
+  </div>
+
+  <div class="card" id="cEnv"><h2>Phone check</h2><div id="envList" class="reason" style="font-size:13.5px;color:var(--ink)"></div></div>
+
+  <div class="card" id="cScanCard">
+    <h2>Scan the nameplate</h2>
+    <div class="npRow">
+      <button class="npBtn" id="bScan">Scan Nameplate</button>
+      <label class="npBtn" id="bUpload">Upload Nameplate<input type="file" accept="image/jpeg,image/png,image/*" id="fUp" class="npHide"></label>
+    </div>
+    <div id="npPanel" class="hide">
+      <img id="npImg" alt="Selected nameplate photo" class="hide">
+      <div id="npHead"></div>
+      <div id="npRows"></div>
+      <div class="npFoot"><span id="npNote">Read on this phone. Check every value against the plate before saving.</span><label class="npRep" id="npRepL"><span id="npRepT">Replace photo</span><input type="file" accept="image/jpeg,image/png,image/*" id="fUp2" class="npHide"></label></div>
+    </div>
+    <div id="err1" class="hide" style="margin-top:8px;padding:10px 12px;border-radius:9px;background:#fde8e8;color:#7f1d1d;font-weight:600;font-size:14px"></div>
+    <div class="tip" style="margin-top:6px">Opens the camera with the Vogelsang nameplate outline. Line the plate up: the outline turns <b style="color:#15803d">green</b>, the plate is read automatically and the values are filled in — no other tap. (The round button captures manually if needed.)</div>
+    <details id="dFallback" style="margin-top:10px"><summary style="font-size:13.5px;color:var(--mut)">Camera not working? Use a photo instead</summary>
+    <div class="row" style="margin-top:8px">
+      <button class="grow" id="bCam">Take photo</button>
+      <button class="grow" id="bLib">Choose from library</button>
+    </div></details>
+    <input type="file" accept="image/*" capture="environment" id="fCam" class="hide">
+    <input type="file" accept="image/*" id="fLib" class="hide">
+    <div class="tip">Best results: flash <b>off</b>, fill the frame with the plate, shoot slightly off-straight to avoid glare. Very dark site: take the photo in the normal Camera app (Night mode) and use “Choose from library”.</div>
+  </div>
+
+  <div class="card hide" id="cCrop">
+    <h2>2 · Line up &amp; read</h2>
+    <div class="seg" role="tablist">
+      <button type="button" id="mVg" class="on">Vogelsang plate</button>
+      <button type="button" id="mFree">Other plate</button>
+    </div>
+    <canvas id="cropCv"></canvas>
+    <div class="tip" id="tipVg">Drag the 4 amber corners onto the 4 corners of the <b>black plate</b> (by the screw holes). The boxes show exactly what will be read: <b>Model &amp; Serial</b> (left) and <b>Year</b> (under the QR code).</div>
+    <div class="tip hide" id="tipFree">Drag a box around the plate text. Tap once to reset to the whole photo.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="bRot">Rotate ⟳</button>
+      <button id="bReset">Reset</button>
+      <button class="amb grow" id="bRead">Read Nameplate</button>
+    </div>
+    <details style="margin-top:10px">
+      <summary>Settings (for testing)</summary>
+      <label class="opt">Page mode
+        <select id="sPsm" style="width:auto;margin:0">
+          <option value="3">Auto (default)</option>
+          <option value="6">Single text block</option>
+          <option value="11">Sparse text (scattered labels)</option>
+        </select></label>
+      <label class="opt"><input type="checkbox" id="sMark"> Show ✓ / ✗ test marking</label>
+      <label class="opt"><input type="checkbox" id="sCamHi"> Live camera in 4K (sharper, more memory)</label>
+      <label class="opt"><input type="checkbox" id="sContrast" checked> Enhance contrast</label>
+      <label class="opt"><input type="checkbox" id="sInvert"> Invert (light text on dark plate)</label>
+      <label class="opt"><input type="checkbox" id="sBin"> Black &amp; white (threshold)</label>
+      <label class="opt">Image size for OCR
+        <select id="sMax" style="width:auto;margin:0">
+          <option value="1600">1600 px</option>
+          <option value="2000" selected>2000 px</option>
+          <option value="2600">2600 px</option>
+        </select></label>
+      <label class="opt">Engine
+        <select id="sEng" style="width:auto;margin:0">
+          <option value="auto" selected>Auto (fast if supported)</option>
+          <option value="plain">Compatible (no SIMD)</option>
+        </select></label>
+      <button id="bRelease" style="min-height:36px">Release OCR engine (free memory)</button>
+      <button id="bClearRuns" style="min-height:36px;margin-left:6px">Clear saved test results</button>
+    </details>
+    <div class="bar"><i id="prog"></i></div>
+    <div id="status"></div>
+    <div id="err"></div>
+    <div class="row hide" id="rowCancel" style="margin-top:8px"><button id="bCancel">Cancel</button></div>
+  </div>
+
+  <div class="card hide" id="cReview">
+    <h2>3 · Values read from the plate</h2>
+    <div class="tip" style="margin:0 0 10px">Filled in automatically. <b>Amber</b> = check this one against the plate; <b>blank</b> = type it. Edit any value directly. Nothing is saved until the asset is saved.</div>
+    <div id="fields"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="amb grow" id="bNext">Scan next plate</button>
+    </div>
+    <div class="row hide">
+      <button class="pri grow" id="bUse">Use These Values</button>
+      <button class="grow" id="bDiscard">Cancel</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="grow" id="bSave">Save test results (.json)</button>
+    </div>
+  </div>
+
+  <div class="card form" id="cForm">
+    <h2>Asset data</h2>
+    <div class="fv"><span>Manufacturer</span><input type="text" id="fmBrand" autocomplete="off" spellcheck="false" placeholder=""></div>
+    <div class="fv"><span>Model / Type</span><input type="text" id="fmModel" autocomplete="off" spellcheck="false" placeholder=""></div>
+    <div class="fv"><span>Serial no. <b id="fmSerialQr" class="qrtag"></b></span><input type="text" id="fmSerial" autocomplete="off" spellcheck="false" placeholder=""></div>
+    <div class="fv"><span>Part no.</span><input type="text" id="fmPart" autocomplete="off" spellcheck="false" placeholder=""></div>
+    <div class="fv"><span>Year</span><select id="fmYear"><option value=""></option></select></div>
+  </div>
+
+  <div class="card hide" id="cDebug">
+    <details><summary>Test details (photo, raw text, timing)</summary>
+    <h2 style="margin-top:10px">What the engine saw</h2>
+    <canvas id="outCv"></canvas>
+    <div class="legend">Word confidence <b style="background:#16a34a"></b>≥80% <b style="background:#d97706"></b>60–79% <b style="background:#dc2626"></b>&lt;60%</div>
+    <h2 style="margin-top:14px">Raw OCR text</h2>
+    <pre id="raw"></pre>
+    <div id="notes" class="reason"></div>
+    <h2 style="margin-top:14px">Timing &amp; device</h2>
+    <table id="tim"></table>
+    <div class="row" style="margin-top:12px">
+      <button class="grow" id="bCopy">Copy results</button>
+      <button class="grow" id="bCopyAll">Copy all runs (<span id="nRuns">0</span>)</button>
+    </div>
+    </details>
+  </div>
+</div>
+
+<div id="scanner" class="hide">
+  <video id="scanVid" playsinline muted autoplay></video>
+  <canvas id="scanView"></canvas>
+  <canvas id="scanCv"></canvas>
+  <div id="scanTip">Point the camera at the black nameplate</div>
+  <div id="scanBar">
+    <button id="bScanClose" style="background:rgba(0,0,0,.5);color:#fff;border-color:#fff">Close</button>
+    <button id="bShot" aria-label="Capture now">Capture</button>
+    <button id="bTorch" class="hide" style="background:rgba(0,0,0,.5);color:#fff;border-color:#fff">Light</button>
+    <button id="bFlip" class="hide" style="background:rgba(0,0,0,.5);color:#fff;border-color:#fff">Lens</button>
+  </div>
+</div>
+
+
+<script>
+/* AssetPulse nameplate parser v1 — turns raw OCR lines into proposed
+ * model / serial / year values. Conservative by design:
+ *  - a value is only proposed when it follows a recognised label;
+ *  - serials stay strings (leading zeros, letters, - / . kept);
+ *  - nothing is "corrected" (no O->0 swaps);
+ *  - more than one distinct candidate => status "check", never a silent pick.
+ * Manufacturer-specific rules can be added to RULES.extra later without
+ * touching the app's save workflow. */
+(function (root) {
+  'use strict';
+
+  // Label patterns. Order inside each list = specificity (first = strongest).
+  var L = {
+    model: [
+      { re: /\bpump\s*type\b/i, w: 1, name: 'Pump type' },
+      { re: /\bpumpentyp\b/i, w: 1, name: 'Pumpentyp' },
+      { re: /\bmodel(?:\s*(?:no|nr)\.?)?\b/i, w: 1, name: 'Model' },
+      { re: /\btyp(?:e)?\b/i, w: 0.9, name: 'Type/Typ' },
+      { re: /\bmod\.(?=\s|:)/i, w: 0.7, name: 'Mod.' }
+    ],
+    serial: [
+      { re: /\bs\s*\/\s*n\b/i, w: 1, name: 'S/N' },
+      { re: /\bserial(?:\s*(?:no|nr|number|#))?\.?/i, w: 1, name: 'Serial No' },
+      { re: /\bser\.?\s*-?\s*(?:no|nr)\b/i, w: 1, name: 'Ser. No' },
+      { re: /\bmasch(?:inen)?\.?\s*-?\s*nr\b/i, w: 1, name: 'Masch.-Nr.' },
+      { re: /\bfabr(?:ik)?\.?\s*-?\s*nr\b/i, w: 1, name: 'Fabr.-Nr.' },
+      { re: /\bwerk\s*-?\s*nr\b/i, w: 0.9, name: 'Werk-Nr.' },
+      { re: /\b(?:machine|m\/c)\s*(?:no|nr)\b/i, w: 0.9, name: 'Machine No' },
+      { re: /^\s*(?:nr|no)\.?(?=[\s:\/])/i, w: 0.5, name: 'No. (generic)' }
+    ],
+    year: [
+      { re: /\b[bg8]aujahr\b/i, w: 1, name: 'Baujahr' },
+      { re: /\byear\s*of\s*(?:manufacture|mfg|construction|constr\.?)\b/i, w: 1, name: 'Year of manufacture' },
+      { re: /\b(?:mfg|manufacturing|construction|constr\.?)\s*(?:year|date)\b/i, w: 1, name: 'Mfg year' },
+      { re: /\bdate\s*of\s*(?:mfg|manufacture)\b/i, w: 1, name: 'Date of mfg' },
+      { re: /\by\.?\s*o\.?\s*m\.?\b/i, w: 0.9, name: 'YOM' },
+      { re: /\byear\b/i, w: 0.9, name: 'Year' },
+      { re: /\bbj\.?(?=[\s:])/i, w: 0.8, name: 'Bj.' }
+    ]
+  };
+  // Labels that look like ours but mean something else.
+  var IGNORE = /\b(?:order|auftrags?|art(?:ikel)?\.?|part|item|ident|tag|job|drawing|zeichnungs?|project|projekt|kom(?:m)?(?:ission)?|ref)\s*\.?\s*-?\s*(?:no|nr|number)\b/i;
+  var NOT_MODEL = /\b(?:motor|seal|mech(?:anical)?|bearing|oil|coupling|gear(?:box)?|insulation|isol|protection|duty|enclosure|medium|media|lubricant|grease)\s*[-\/]?\s*$/i;
+  var ANY_LABEL = (function () {
+    var all = [];
+    ['model', 'serial', 'year'].forEach(function (k) { L[k].forEach(function (x) { all.push(x.re.source.replace(/^\^\\s\*/, '')); }); });
+    all.push(IGNORE.source);
+    all.push('\\b(?:kw|hp|rpm|min-1|1\\/min|bar|m3\\/h|hz|volts?|amps?|ip\\d\\d)\\b');
+    return new RegExp('(?:' + all.join('|') + ')', 'i');
+  })();
+  var SEP = /^[\s:;.,=\-\/|]+/;
+
+  function norm(s) { return String(s || '').replace(/[\u2010-\u2015]/g, '-').replace(/\s+/g, ' ').trim(); }
+
+  // Remainder of the line after the label, stopping at the next label.
+  function remainderAfter(text, m) {
+    var rest = text.slice(m.index + m[0].length);
+    // bilingual repeats: "Typ/Type:", "Masch.-Nr./Serial No."
+    for (var i = 0; i < 3; i++) {
+      rest = rest.replace(SEP, '');
+      var again = rest.match(ANY_LABEL);
+      if (again && again.index === 0) rest = rest.slice(again[0].length); else break;
+    }
+    rest = rest.replace(SEP, '');
+    var nxt = rest.match(ANY_LABEL);
+    if (nxt && nxt.index > 0) rest = rest.slice(0, nxt.index);
+    rest = rest.split(/\s{3,}/)[0];
+    return norm(rest.replace(/[\s:;,=|]+$/, ''));
+  }
+
+  function wordConf(line, value) {
+    if (!line || !line.words || !value) return null;
+    var toks = value.split(/\s+/), hits = [];
+    line.words.forEach(function (w) {
+      var t = String(w.text || '').trim();
+      if (t && toks.some(function (k) { return k.indexOf(t) >= 0 || t.indexOf(k) >= 0; })) hits.push(w.confidence);
+    });
+    if (!hits.length) return null;
+    return Math.round(hits.reduce(function (a, b) { return a + b; }, 0) / hits.length);
+  }
+
+  var V = {
+    model: function (s) {
+      s = s.replace(/^(?:no|nr)\.?\s*/i, '').slice(0, 40).trim();
+      if (!/[A-Za-z0-9]/.test(s) || s.length < 2) return null;
+      return s;
+    },
+    serial: function (s) {
+      var tok = (s.match(/[A-Za-z0-9][A-Za-z0-9\-\/\.]*/) || [''])[0].replace(/[.\-\/]+$/, '');
+      if (!/\d/.test(tok) || tok.length < 3) return null;
+      return tok;
+    },
+    year: function (s, opts) {
+      var maxY = opts.maxYear, m = s.match(/(?:^|[^\d])((?:19|20)\d{2})(?!\d)/);
+      if (!m) return null;
+      var y = +m[1];
+      if (y < 1950 || y > maxY) return null;
+      return m[1];
+    }
+  };
+
+  // Manufacturer-specific rules. Each is verified against real plates before it
+  // is added; nothing here guesses at formats it has not seen.
+  // Vogelsang (seen on: XRC100-320QD / XRC0000098, XRG186-1300QD / XRG0000027):
+  //   model  = 2-3 letters + 2-3 digits + '-' + 2-4 digits + optional letters
+  //   serial = 2-3 letters + 6-8 digits, and its letter prefix matches the model's.
+  var VG_MODEL = /\b([A-Z]{2,3}\d{2,3}-\d{2,4}[A-Z]{0,3})\b/;
+  var VG_SERIAL = /\b([A-Z]{2,3}\d{6,8})\b/g;
+  var RULES = [{
+    name: 'Vogelsang',
+    applies: function (lines) { return lines.some(function (l) { return /vogelsang/i.test(l.text) || VG_MODEL.test(l.text); }); },
+    run: function (lines, wc) {
+      var res = {}, model = null;
+      lines.some(function (l, i) { var m = l.text.match(VG_MODEL); if (m) { model = { v: m[1], line: l, i: i }; return true; } return false; });
+      if (model) {
+        var c = wc(model.line, model.v);
+        res.model = { value: model.v, conf: c, status: c != null && c >= 80 ? 'ok' : 'check',
+          reason: 'Vogelsang model pattern on line ' + (model.i + 1) + (c != null ? ', OCR confidence ' + c + '%' : '') + (c != null && c >= 80 ? '' : '. Check against the plate.'), alternatives: [] };
+      }
+      var prefix = model ? model.v.match(/^[A-Z]+/)[0] : null, sers = [];
+      lines.forEach(function (l, i) { var m; VG_SERIAL.lastIndex = 0; while ((m = VG_SERIAL.exec(l.text))) sers.push({ v: m[1], line: l, i: i }); });
+      if (sers.length) {
+        var match = sers.filter(function (x) { return prefix && x.v.indexOf(prefix) === 0; });
+        var best = match[0] || sers[0], c2 = wc(best.line, best.v), ok = match.length === 1 && c2 != null && c2 >= 80;
+        res.serial = { value: best.v, conf: c2, status: ok ? 'ok' : 'check',
+          reason: 'Vogelsang serial pattern on line ' + (best.i + 1) + (match.length ? ' (prefix ' + prefix + ' matches the model)' : ' (prefix does not match the model)') + (c2 != null ? ', OCR confidence ' + c2 + '%' : '') + (ok ? '' : '. Check against the plate.'),
+          alternatives: sers.filter(function (x) { return x !== best; }).map(function (x) { return { value: x.v, label: 'pattern', line: x.i + 1, conf: null }; }) };
+      }
+      return res;
+    }
+  }];
+
+  function parse(lines, opts) {
+    opts = opts || {};
+    opts.maxYear = opts.maxYear || (new Date().getFullYear() + 1);
+    var clean = (lines || []).map(function (l) { return { text: norm(l.text), words: l.words || [], conf: l.confidence }; })
+      .filter(function (l) { return l.text; });
+    var out = {}, ignored = [];
+    ['model', 'serial', 'year'].forEach(function (field) {
+      var cands = [];
+      clean.forEach(function (line, i) {
+        L[field].forEach(function (lab) {
+          var m = line.text.match(lab.re);
+          if (!m) return;
+          var before = line.text.slice(0, m.index);
+          var labelWithContext = line.text.slice(Math.max(0, m.index - 14), m.index + m[0].length + 6);
+          if (IGNORE.test(labelWithContext)) { ignored.push('"' + labelWithContext.trim() + '" ignored (not a ' + field + ' label)'); return; }
+          if (field === 'model' && NOT_MODEL.test(before)) { ignored.push('"' + norm(before + m[0]) + '" ignored (describes another part)'); return; }
+          var raw = remainderAfter(line.text, m), from = 'same line', srcLine = line;
+          if (!raw && clean[i + 1]) {
+            var nl = clean[i + 1].text;
+            if (!ANY_LABEL.test(nl.slice(0, 12))) { raw = norm(nl.split(/\s{3,}/)[0]); from = 'line below'; srcLine = clean[i + 1]; }
+          }
+          var val = raw ? V[field](raw, opts) : null;
+          if (!val) return;
+          var c = wordConf(srcLine, val);
+          cands.push({ value: val, conf: c, label: lab.name, weight: lab.w, from: from, line: i + 1,
+            score: lab.w * (c == null ? 60 : c) });
+        });
+      });
+      // one candidate per distinct value, best score kept
+      var by = {};
+      cands.forEach(function (c) { var k = c.value.toUpperCase(); if (!by[k] || by[k].score < c.score) by[k] = c; });
+      var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.score - a.score; });
+      var best = list[0] || null, status, reason;
+      if (!best) { status = 'none'; reason = 'No clearly labelled ' + field + ' found — enter it manually.'; }
+      else {
+        reason = 'Found after label "' + best.label + '" on line ' + best.line + ' (' + best.from + ')' + (best.conf != null ? ', OCR confidence ' + best.conf + '%' : '');
+        if (list.length > 1) { status = 'check'; reason += '. ' + (list.length - 1) + ' other candidate(s) — check against the plate.'; }
+        else if (best.conf != null && best.conf < 75) { status = 'check'; reason += '. Low confidence — check against the plate.'; }
+        else if (best.weight < 0.8) { status = 'check'; reason += '. Generic label — check against the plate.'; }
+        else status = 'ok';
+      }
+      out[field] = { value: best ? best.value : '', conf: best ? best.conf : null, status: status, reason: reason,
+        alternatives: list.slice(1).map(function (c) { return { value: c.value, label: c.label, line: c.line, conf: c.conf }; }) };
+    });
+    // ---- Manufacturer rules (used only when no labelled value was found) ----
+    RULES.forEach(function (rule) {
+      if (!rule.applies(clean)) return;
+      var r = rule.run(clean, wordConf);
+      ['model', 'serial', 'year'].forEach(function (k) {
+        if (!r[k] || out[k].value) return;
+        out[k] = r[k];
+      });
+    });
+    // ---- Every code-like token on the plate, so the user can tap instead of type ----
+    var seen = {}, used = [out.model.value, out.serial.value].map(function (v) { return String(v).toUpperCase(); });
+    out.codes = [];
+    clean.forEach(function (l) {
+      (l.words.length ? l.words : l.text.split(' ').map(function (t) { return { text: t, confidence: l.conf }; })).forEach(function (w) {
+        var t = String(w.text || '').replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+        if (t.length < 5 || !/\d/.test(t)) return;
+        if (!/[A-Za-z]/.test(t) && t.length < 6) return;
+        if (w.confidence != null && w.confidence < 50) return;
+        var K = t.toUpperCase();
+        if (seen[K] || used.indexOf(K) >= 0) return;
+        seen[K] = 1; out.codes.push({ value: t, conf: w.confidence == null ? null : Math.round(w.confidence) });
+      });
+    });
+    // Unlabelled 4-digit years: reported, never used.
+    var loose = [];
+    clean.forEach(function (l, i) { (l.text.match(/(?:^|[^\d])((?:19|20)\d{2})(?!\d)/g) || []).forEach(function (y) { loose.push(y.replace(/\D/g, '') + ' (line ' + (i + 1) + ')'); }); });
+    out.notes = { ignored: ignored, yearLikeNumbers: loose };
+    return out;
+  }
+
+  // ---- Vogelsang scanner box: lines from the left text block + the year box ----
+  // Template (VX, VY, XRP, XRC, XRG manuals): left block = Product, Series/Type,
+  // Serial, Part number, Other (order varies by edition); year sits in the box
+  // under the QR code, next to the weight.
+  function parseVogelsang(textLines, yearLines, opts) {
+    opts = opts || {}; var maxY = opts.maxYear || (new Date().getFullYear() + 1);
+    // Keep every line (even empty ones) so line numbers match the image bands they came from.
+    var T = (textLines || []).map(function (l) { return { text: norm(l.text), words: l.words || [], conf: l.confidence }; });
+    var Y = (yearLines || []).map(function (l) { return { text: norm(l.text), words: l.words || [], conf: l.confidence }; });
+    var out = {};
+    // Model
+    var mods = [];
+    T.forEach(function (l, i) { var m = l.text.toUpperCase().match(VG_MODEL); if (m) mods.push({ v: m[1], l: l, i: i }); });
+    if (!mods.length) {
+      T.forEach(function (l, i) {
+        if (mods.length) return;
+        var m = l.text.match(/^\W*(\d{2,3}-\d{2,4}[A-Z]{0,4})\b/), prev = T[i - 1];
+        var pre = prev && prev.text.match(/\b([A-Z]{2,3})\s*$/);
+        if (m && pre) mods.push({ v: pre[1] + m[1], l: l, i: i, composed: pre[1] + ' (product line) + ' + m[1] + ' (series line)' });
+      });
+    }
+    if (mods.length) {
+      var m0 = mods[0], c = wordConf(m0.l, m0.composed ? m0.v.replace(/^[A-Z]+/, '') : m0.v), ok = c != null && c >= 75 && mods.length === 1;
+      out.model = { value: m0.v, conf: c, status: ok ? 'ok' : 'check', line: m0.i, composed: !!m0.composed,
+        reason: (m0.composed ? 'Built from ' + m0.composed : 'Read from the Series line of the plate') + (c != null ? ', OCR confidence ' + c + '%' : '') + (ok ? '' : (mods.length > 1 ? '. More than one model-like code — check.' : '. Check against the plate.')),
+        alternatives: mods.slice(1).map(function (x) { return { value: x.v, label: 'pattern', line: x.i + 1, conf: null }; }) };
+    } else out.model = { value: '', conf: null, status: 'none', reason: 'Model not recognised — enter it manually.', alternatives: [] };
+    // Serial: letters + 6-8 digits whose prefix matches the model; else best code-like token
+    var prefix = out.model.value ? out.model.value.match(/^[A-Z]+/)[0] : null, sers = [], loose = [];
+    T.forEach(function (l, i) {
+      if (out.model.value && i === out.model.line) return;
+      l.text.split(/\s+/).forEach(function (raw) {
+        var t = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '').toUpperCase();
+        var m = t.match(/^([A-Z0-9]{3})([0-9ODQIL]{7})$/) || t.match(/^([A-Z0-9]{3})O([0-9]{7})$/);
+        if (!m || !/^[A-Z]{3}$/.test(m[1].replace(/0/g, 'O'))) return;
+        var digits = m[2].replace(/[ODQ]/g, '0').replace(/[IL]/g, '1'), letters = m[1].replace(/0/g, 'O');
+        sers.push({ v: letters + digits, l: l, i: i, fixed: (letters + digits) !== t, raw: t });
+      });
+      l.text.split(' ').forEach(function (t) {
+        t = t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+        if (t.length >= 6 && /\d/.test(t) && !/\./.test(t) && !/kg$/i.test(t)) loose.push({ v: t, l: l, i: i });
+      });
+    });
+    var us = sers.filter(function (x, i) { return sers.findIndex(function (z) { return z.v === x.v; }) === i; });
+    var best = us[0] || null, how, pm = us;
+    if (best) how = 'Vogelsang serial format: 3 letters + 7 digits' + (best.fixed ? '; read as "' + best.raw + '", letter O/I in the number part taken as 0/1' : '');
+    else if (loose.length === 1) { best = loose[0]; best.weak = true; how = 'only serial-like code in the text block, not in the Vogelsang serial format'; }
+    if (best) {
+      var c2 = wordConf(best.l, best.raw || best.v), ok2 = us.length === 1 && !best.fixed && c2 != null && c2 >= 75;
+      out.serial = { value: best.v, conf: c2, status: ok2 && !best.weak ? 'ok' : 'check', line: best.i, weak: !!best.weak, fixed: !!best.fixed,
+        reason: 'Read from the text block (' + how + ')' + (c2 != null ? ', OCR confidence ' + c2 + '%' : '') + (ok2 ? '' : '. Check against the plate.'),
+        alternatives: (us.length > 1 ? us : loose).filter(function (x) { return x.v !== best.v; }).slice(0, 3).map(function (x) { return { value: x.v, label: 'plate', line: x.i + 1, conf: null }; }) };
+    } else out.serial = { value: '', conf: null, status: 'none', reason: 'Serial number not recognised — enter it manually.', alternatives: loose.slice(0, 3).map(function (x) { return { value: x.v, label: 'plate', line: x.i + 1, conf: null }; }) };
+    // Year: a 4-digit year in the year box that is not the weight
+    var ys = [];
+    Y.forEach(function (l, li) {
+      var re = /(?:^|[^\d])((?:19|20)\d{2})(?!\d)(\s*kg)?/gi, m;
+      while ((m = re.exec(l.text))) { var y = +m[1]; if (!m[2] && y >= 1950 && y <= maxY) ys.push({ v: m[1], l: l, i: li }); }
+    });
+    var uy = ys.filter(function (x, i) { return ys.findIndex(function (z) { return z.v === x.v; }) === i; });
+    if (uy.length) {
+      var c3 = wordConf(uy[0].l, uy[0].v), ok3 = uy.length === 1 && c3 != null && c3 >= 75;
+      out.year = { value: uy[0].v, conf: c3, status: ok3 ? 'ok' : 'check', line: uy[0].i,
+        reason: 'Read from the year box' + (c3 != null ? ', OCR confidence ' + c3 + '%' : '') + (ok3 ? '' : (uy.length > 1 ? '. More than one year in the box — check.' : '. Check against the plate.')),
+        alternatives: uy.slice(1).map(function (x) { return { value: x.v, label: 'year box', line: null, conf: null }; }) };
+    } else out.year = { value: '', conf: null, status: 'none', reason: 'Year not recognised — select it manually.', alternatives: [] };
+    // Plate line 4 (letters + 7 digits, e.g. PVX0000046) is the PART NUMBER (confirmed by the user 7 Nov 2026).
+    out.partNo = out.serial;
+    out.partNo.reason = out.partNo.reason.replace('Vogelsang serial format: 3 letters + 7 digits', 'Vogelsang part-number format: 3 letters + 7 digits').replace('Serial number not recognised', 'Part number not recognised');
+    // Plate line 3 is the SERIAL NUMBER: xxx.xxxx.xxxx (e.g. BRA.3136.2840) or 11 digits on XRC plates (e.g. 00000040648).
+    var sl = [];
+    T.forEach(function (l, i) { if (i === out.model.line || i === out.partNo.line) return; var v = serialLineIn(l.text); if (v) sl.push({ v: v, l: l, i: i }); });
+    var su = sl.filter(function (x, k) { return sl.findIndex(function (z) { return z.v === x.v; }) === k; });
+    if (su.length) {
+      var b = su[0], cs = wordConf(b.l, b.v.split('.')[0]), oks = su.length === 1 && cs != null && cs >= 75;
+      out.serial = { value: b.v, conf: cs, status: oks ? 'ok' : 'check', line: b.i,
+        reason: 'Read from line ' + (b.i + 1) + ' of the text block (serial format ' + (/\./.test(b.v) ? 'xxx.xxxx.xxxx' : '11 digits') + ')' + (cs != null ? ', OCR confidence ' + cs + '%' : '') + (oks ? '' : '. Check against the plate.'),
+        alternatives: su.slice(1).map(function (x) { return { value: x.v, label: 'plate', line: x.i + 1, conf: null }; }) };
+    } else out.serial = { value: '', conf: null, status: 'none', reason: 'Serial number not recognised — enter it manually.', alternatives: [] };
+    out.notes = { ignored: [], yearLikeNumbers: [] };
+    return out;
+  }
+  // ---- Model catalogue (first column of the Vogelsang technical data sheets in VGS docs) ----
+  // Rotary lobe pumps: rotary-lobe-pumps-technical-data-en-vgs936.pdf (2024)
+  // XRipper: Specification_Grinder_XRipper Series.pdf (2018); XRG186 confirmed by the user as a newer range.
+  var CAT = {
+    EP136: [70, 105, 140], IQ112: [81, 114], IQ152: [112, 158],
+    VX100: [45, 64, 90, 128], VX136: [70, 105, 140, 210, 280, 420], VX186: [92, 130, 184, 260, 368, 390, 520, 736],
+    VX215: [226, 320, 452, 640], VX230: [226, 320, 452, 640],
+    VY100: [45, 64, 90, 128], VY136: [70, 105, 140],
+    XRS100: [90], XRS136: [140], XRS186: [130, 260],
+    XRP100: [90], XRP136: [140, 200], XRP186: [260, 520],
+    XRC100: [320, 480, 640, 800, 960], XRC136: [280, 560], XRC186: [260, 520, 780],
+    XRG136: [560, 840, 1120, 1400], XRG186: null   // null = new range, sizes not in the sheet yet
+  };
+  // Serial letter prefixes seen on real Vogelsang plates (16 photos, 6 Nov 2026). A new prefix is never
+  // rejected — it is shown as "Check" so the engineer confirms it.
+  var SERIAL_PREFIXES = ['PVX', 'PPK', 'IBN', 'XRC', 'XRG'];
+  function serialPrefixKnown(v) { return SERIAL_PREFIXES.indexOf(String(v || '').slice(0, 3)) >= 0; }
+  function catalogue(model) { // -> { ok, why }
+    var m = String(model || '').match(/^([A-Z]{2,3}\d{3})-(\d{2,4})([A-Z]{0,3})(\+HC[SD])?$/);
+    if (!m) return { ok: false, why: 'not in the Vogelsang type format' };
+    if (!(m[1] in CAT)) return { ok: false, why: m[1] + ' is not a series in the catalogue' };
+    var sizes = CAT[m[1]];
+    if (sizes && sizes.indexOf(+m[2]) < 0) return { ok: false, why: m[1] + '-' + m[2] + ' is not a size in the catalogue (' + m[1] + ': ' + sizes.join(', ') + ')' };
+    if (/^XRG/.test(m[1]) && !m[4]) return { ok: false, why: 'XRG model without +HCS / +HCD' };
+    return { ok: true, why: sizes ? 'in the catalogue' : m[1] + ' is a new range (sizes not listed yet)' };
+  }
+
+  // Helpers for repeated reads of one line
+  function modelIn(text, productLine) {
+    var t = String(text || '').toUpperCase(), m = t.match(VG_MODEL);
+    if (m) { var hc = t.slice(t.indexOf(m[1]) + m[1].length).match(/^\s*\+?\s*(HC[SD])\b/); return m[1] + (hc ? '+' + hc[1] : ''); }
+    var m2 = t.match(/(?:^|[^A-Z0-9])(\d{2,3}-\d{2,4}[A-Z]{0,4})\b/), pre = String(productLine || '').toUpperCase().match(/\b([A-Z]{2,3})\s*$/);
+    return m2 && pre ? pre[1] + m2[1] : null;
+  }
+  // Serial number (plate line 3): AAA.NNNN.NNNN, or 11 digits on XRC plates. O/D/Q -> 0, I/L -> 1 only in number parts.
+  var SERIAL_LETTERS = ['BRA', 'BKB', 'BKC', 'BHC', 'BJC', 'COK'];  // seen on real plates, 6 Nov 2026
+  function fixDigits(x) { return x.replace(/[ODQ]/g, '0').replace(/[IL]/g, '1'); }
+  function serialLineIn(text) {
+    var t = String(text || '').toUpperCase().replace(/\s*([.,:·])\s*/g, '$1');  // join "BRA. 3136" but keep a gap before stray marks
+    var m = t.match(/([A-Z0-9]{3})[.,:·]?([0-9ODQIL]{4})[.,:·]?([0-9ODQIL]{4})(?![0-9A-Z])/);
+    if (m && (m[1].match(/[A-Z]/g) || []).length >= 2 && /^[A-Z]{3}$/.test(m[1].replace(/0/g, 'O').replace(/8/g, 'B'))) {
+      var L3 = m[1].replace(/0/g, 'O').replace(/8/g, 'B');
+      return L3 + '.' + fixDigits(m[2]) + '.' + fixDigits(m[3]);
+    }
+    var m2 = t.match(/(?:^|[^0-9A-Z])([0-9ODQ]{11})(?![0-9A-Z])/);
+    if (m2 && /^\d/.test(m2[1])) return fixDigits(m2[1]);
+    return null;
+  }
+  function serialKnown(v) { return /^\d{11}$/.test(v) || SERIAL_LETTERS.indexOf(String(v || '').slice(0, 3)) >= 0; }
+  function partIn(text) {
+    var hit = null;
+    String(text || '').split(/\s+/).some(function (raw) {
+      var t = raw.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '').toUpperCase();
+      var m = t.match(/^([A-Z0-9]{3})([0-9ODQIL]{7})$/) || t.match(/^([A-Z0-9]{3})O([0-9]{7})$/);
+      if (!m || !/^[A-Z]{3}$/.test(m[1].replace(/0/g, 'O'))) return false;
+      hit = m[1].replace(/0/g, 'O') + m[2].replace(/[ODQ]/g, '0').replace(/[IL]/g, '1'); return true;
+    });
+    return hit;
+  }
+  function yearsIn(text, maxY) { // 4-digit years inside the first row that has 4+ digits (year sits above the weight)
+    var rows = String(text || '').split(/\n/).map(function (r) { return r.replace(/\D/g, ''); }).filter(function (r) { return r.length >= 4; });
+    // first row (top to bottom) that holds a valid year: QR-code edges read as digit noise above it are skipped,
+    // and the weight row sits below the year
+    for (var ri = 0; ri < rows.length; ri++) {
+      var r = rows[ri], out = [];
+      for (var i = 0; i + 4 <= r.length; i++) { var y = +r.substr(i, 4); if (/^(19|20)/.test(r.substr(i, 4)) && y >= 1990 && y <= maxY && out.indexOf(String(y)) < 0) out.push(String(y)); }
+      if (out.length) return out;
+    }
+    return [];
+  }
+  root.NameplateParser = { parse: parse, parseVogelsang: parseVogelsang, modelIn: modelIn, catalogue: catalogue, CAT: CAT, partPrefixKnown: serialPrefixKnown, PART_PREFIXES: SERIAL_PREFIXES, partIn: partIn, serialIn: serialLineIn, serialKnown: serialKnown, SERIAL_LETTERS: SERIAL_LETTERS, yearsIn: yearsIn, version: '2.1', labels: L, VG_MODEL: VG_MODEL, VG_SERIAL: VG_SERIAL };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var BUILD = '2026-11-07.1636-S';
+  var TEST = /[?&]test=1/.test(location.search);
+  if (!TEST) document.body.classList.add('lean');
+  // Embedded in the field app (full-screen frame): open the camera at once, hand the values back, close.
+  var EMBED = window.__APSCAN_EMBED === true, embedSent = false, PHOTO_EMBED = window.__APSCAN_MODE === 'photo', photoJob = null;
+  if (EMBED || PHOTO_EMBED) document.body.classList.add('embed');
+  function embedPost(m) { if (!EMBED || embedSent) return; embedSent = true; m.__apscan = 1; m.build = BUILD; try { window.parent.postMessage(m, '*'); } catch (e) {} }
+  var MAX_YEAR = new Date().getFullYear() + 1;
+  var YEARS = []; for (var y = 1990; y <= MAX_YEAR; y++) YEARS.push(String(y));
+  YEARS.forEach(function (y) { var o = document.createElement('option'); o.value = o.textContent = y; $('fmYear').appendChild(o); });
+
+  // ---------- embedded asset unpacking (lazy: only on first Read) ----------
+  var assets = {};
+  function b64bytes(id) {
+    var el = document.getElementById(id);
+    var bin = atob(el.textContent.trim()), u = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u;
+  }
+  async function gunzip(u) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('This browser is too old to unpack the OCR engine (needs iOS 16.4+ / Chrome 80+).');
+    var buf = await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    return new Uint8Array(buf);
+  }
+  async function assetBytes(id) { return gunzip(b64bytes(id)); }
+  // The worker is ONE self-contained script (shim + engine core + tesseract worker),
+  // so nothing is loaded across contexts. This is what makes it work from a local
+  // file (file:// / content://) as well as from a website.
+  var LANG_SHIM = "(function(){var buf=null,wait=[];self.addEventListener('message',function(e){if(e.data&&e.data.__ocrLang){buf=e.data.__ocrLang;e.stopImmediatePropagation();wait.splice(0).forEach(function(f){f();});}});var of=self.fetch;self.fetch=function(u){if(String(u).indexOf('__ocrlang__')>=0){return new Promise(function(res){var go=function(){res(new Response(buf.slice(0)));};buf?go():wait.push(go);});}return of?of.apply(self,arguments):Promise.reject(new Error('offline'));};})();\n";
+  var workerUrls = {}, langRaw = null;
+  async function workerUrl(useSimd) {
+    var k = useSimd ? 'simd' : 'plain';
+    if (workerUrls[k]) return workerUrls[k];
+    var core = await assetBytes(useSimd ? 'a-core-simd' : 'a-core');
+    var wk = await assetBytes('a-worker');
+    workerUrls[k] = URL.createObjectURL(new Blob([LANG_SHIM, core, '\n;\n', wk], { type: 'text/javascript' }));
+    return workerUrls[k];
+  }
+  function simdOK() {
+    try { return WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11])); } catch (e) { return false; }
+  }
+
+  // ---------- OCR engine (one reusable worker) ----------
+  var worker = null, workerKey = '', curJob = null, progSink = function () {};
+  var workerBusy = null;
+  function prewarm() { if (!workerBusy && !worker) { workerBusy = getWorkerRaw($('sEng').value, function () {}).catch(function () {}).then(function (x) { workerBusy = null; return x; }); } }
+  async function getWorker(engine, onProg) { if (workerBusy) await workerBusy; return getWorkerRaw(engine, onProg); }
+  // ---- Small build: the OCR engine is downloaded on first use from a public CDN (pinned versions), then cached ----
+  var CDNS = ['https://cdn.jsdelivr.net/npm/', 'https://unpkg.com/'];
+  var PIN = { js: 'tesseract.js@6.0.1/dist/', core: 'tesseract.js-core@6.1.2', lang: '@tesseract.js-data/eng@1.0.0/4.0.0_best_int' };
+  function loadScript(u) { return new Promise(function (res, rej) { var sc = document.createElement('script'); sc.src = u; sc.onload = res; sc.onerror = function () { sc.remove(); rej(new Error('download failed')); }; document.head.appendChild(sc); }); }
+  var ocrLogger = function (m) {
+    if (!m || !m.status) return;
+    var map = { 'loading tesseract core': 'Starting OCR engine…', 'initializing tesseract': 'Starting OCR engine…', 'loading language traineddata': 'Loading English model…', 'initializing api': 'Starting OCR engine…', 'recognizing text': 'Reading nameplate…' };
+    var base = m.status === 'recognizing text' ? 0.35 : 0.05, span = m.status === 'recognizing text' ? 0.6 : 0.3;
+    progSink(map[m.status] || m.status, base + span * (m.progress || 0));
+  };
+  // Extra engine for reading a second camera frame at the same time (phones with 4+ cores)
+  var POOL = Math.min(2, Math.max(1, (navigator.hardwareConcurrency || 2) >= 4 ? 2 : 1)), extra = null, extraBusy = null;
+  async function getExtraWorker() {
+    if (extra) return extra;
+    if (extraBusy) return extraBusy;
+    if (!document.getElementById('a-worker') && window.caches) {   // second engine from the same offline pack (no extra download)
+      extraBusy = (async function () {
+        try {
+          await getWorker('auto', function () {});
+          var wUrl = workerUrls['pack' + workerKey]; if (!wUrl || !langRaw) return null;
+          var NativeWorker = window.Worker;
+          window.Worker = function (url, o) { var w = new NativeWorker(url, o); if (String(url) === wUrl) { var copy = langRaw.slice().buffer; w.postMessage({ __ocrLang: copy }, [copy]); } return w; };
+          try { extra = await Tesseract.createWorker('eng', 1, { workerPath: wUrl, workerBlobURL: false, langPath: 'https://local.invalid/__ocrlang__', gzip: false, cacheMethod: 'none', errorHandler: function (e) { console.warn('[ocr2]', e); } }); }
+          finally { window.Worker = NativeWorker; }
+          return extra;
+        } catch (e) { return null; }
+      })();
+      var w0 = await extraBusy; extraBusy = null; return w0;
+    }
+    extraBusy = (async function () {
+      for (var i = 0; i < CDNS.length; i++) {
+        try {
+          if (!window.Tesseract) await loadScript(CDNS[i] + PIN.js + 'tesseract.min.js');
+          extra = await Tesseract.createWorker('eng', 1, { workerPath: CDNS[i] + PIN.js + 'worker.min.js', corePath: CDNS[i] + PIN.core, langPath: CDNS[i] + PIN.lang, cacheMethod: /^(file|content):/.test(location.protocol) ? 'none' : 'write' });
+          return extra;
+        } catch (e) {}
+      }
+      return null;
+    })();
+    var w = await extraBusy; extraBusy = null; return w;
+  }
+  async function getWorkerCdn(onProg) {
+    if (worker) return { w: worker, variant: workerKey, fresh: false };
+    var t0 = performance.now(), last = null, local = /^(file|content):/.test(location.protocol);
+    if (navigator.onLine === false) throw new Error('No internet. The first scan downloads the OCR engine (about 4 MB, once) — connect and try again.');
+    for (var i = 0; i < CDNS.length; i++) {
+      var c = CDNS[i];
+      try {
+        onProg(i ? 'Trying backup download…' : 'Downloading OCR engine (first time only)…', 0.03);
+        if (!window.Tesseract) await loadScript(c + PIN.js + 'tesseract.min.js');
+        var w = await Promise.race([
+          Tesseract.createWorker('eng', 1, { workerPath: c + PIN.js + 'worker.min.js', corePath: c + PIN.core, langPath: c + PIN.lang, cacheMethod: local ? 'none' : 'write', logger: ocrLogger, errorHandler: function (e) { console.warn('[ocr]', e); } }),
+          new Promise(function (_, rej) { setTimeout(function () { rej(new Error('download timed out')); }, 90000); })
+        ]);
+        worker = w; workerKey = 'cdn' + (i ? '-backup' : '');
+        return { w: w, variant: workerKey, fresh: true, tUnpack: 0, tInit: performance.now() - t0 };
+      } catch (e) { last = e; try { if (window.Tesseract && !worker) {} } catch (x) {} }
+    }
+    throw new Error('The OCR engine could not be downloaded (' + (last && last.message) + '). Check the internet connection and try again.');
+  }
+  // ---- Offline pack: the OCR engine files are downloaded ONCE into this phone's Cache Storage and are
+  // read from there afterwards — no internet needed after that, nothing is sent anywhere.
+  var PACK_CACHE = 'assetpulse-ocr-pack-v1', packMem = {};
+  function packFiles(useSimd) {
+    return [{ k: 'lib', p: PIN.js + 'tesseract.min.js' }, { k: 'worker', p: PIN.js + 'worker.min.js' },
+      { k: 'core', p: PIN.core + (useSimd ? '/tesseract-core-simd-lstm.wasm.js' : '/tesseract-core-lstm.wasm.js') },
+      { k: 'lang', p: PIN.lang + '/eng.traineddata.gz' }, { k: 'qr', p: 'jsqr@1.4.0/dist/jsQR.js' }];
+  }
+  function packKey(p) { return 'https://assetpulse-ocr-pack.local/' + p; }
+  async function packCache() { try { return window.caches ? await caches.open(PACK_CACHE) : null; } catch (e) { return null; } }
+  async function packGet(f, allowNet) {
+    if (packMem[f.p]) return packMem[f.p];
+    var cache = await packCache();
+    if (cache) { var hit = await cache.match(packKey(f.p)); if (hit) return (packMem[f.p] = new Uint8Array(await hit.arrayBuffer())); }
+    if (!allowNet || navigator.onLine === false) { var er = new Error('offline-missing'); er.offlineMissing = true; throw er; }
+    var last = null;
+    for (var i = 0; i < CDNS.length; i++) {
+      try {
+        var r = await fetch(CDNS[i] + f.p, { mode: 'cors', credentials: 'omit' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var u = new Uint8Array(await r.arrayBuffer());
+        if (cache) { try { await cache.put(packKey(f.p), new Response(u, { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) {} }
+        return (packMem[f.p] = u);
+      } catch (e) { last = e; }
+    }
+    throw new Error('download failed (' + (last && last.message) + ')');
+  }
+  async function packStatus() {
+    var cache = await packCache(); if (!cache) return { ok: false, cacheApi: false, miss: ['all'] };
+    var miss = [], fs = packFiles(simdOK());
+    for (var i = 0; i < fs.length; i++) if (!(await cache.match(packKey(fs[i].p)))) miss.push(fs[i].k);
+    return { ok: !miss.length, cacheApi: true, miss: miss };
+  }
+  async function packEnsure(onProg) {
+    var fs = packFiles(simdOK());
+    for (var i = 0; i < fs.length; i++) { if (onProg) onProg('Downloading the OCR engine for offline use (' + (i + 1) + ' of ' + fs.length + ')…'); await packGet(fs[i], true); }
+    try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
+    return packStatus();
+  }
+  function scriptFromBytes(u) { return new Promise(function (res, rej) { var url = URL.createObjectURL(new Blob([u], { type: 'text/javascript' })), sc = document.createElement('script'); sc.src = url; sc.onload = function () { res(); }; sc.onerror = function () { rej(new Error('engine script failed')); }; document.head.appendChild(sc); }); }
+  async function getWorkerRaw(engine, onProg) {
+    var EMB = !!document.getElementById('a-worker');
+    if (!EMB && !window.caches) return getWorkerCdn(onProg);
+    var useSimd = (engine === 'auto' || !EMB) && simdOK();
+    var key = useSimd ? 'simd' : 'plain';
+    if (worker && workerKey === key) return { w: worker, variant: key, fresh: false };
+    if (worker) { try { await worker.terminate(); } catch (e) {} worker = null; }
+    var t0 = performance.now();
+    onProg('Preparing OCR engine…', 0.02);
+    var wUrl;
+    if (EMB) { wUrl = await workerUrl(useSimd); if (!langRaw) langRaw = await assetBytes('a-eng'); }
+    else {
+      try {
+        var fs = packFiles(useSimd), got = {};
+        for (var pi = 0; pi < 4; pi++) { if (!packMem[fs[pi].p]) onProg('Downloading the OCR engine (one time only)…', 0.03); got[fs[pi].k] = await packGet(fs[pi], true); }
+        if (!window.Tesseract) await scriptFromBytes(got.lib);
+        if (!workerUrls['pack' + key]) workerUrls['pack' + key] = URL.createObjectURL(new Blob([LANG_SHIM, got.core, '\n;\n', got.worker], { type: 'text/javascript' }));
+        wUrl = workerUrls['pack' + key];
+        if (!langRaw) langRaw = await gunzip(got.lang);
+      } catch (e) {
+        if (e && e.offlineMissing) throw new Error('The OCR engine is not on this phone yet. Connect to the internet once and open the app — it downloads automatically (about 5 MB, one time).');
+        if (navigator.onLine !== false && !window.__packOnly) return getWorkerCdn(onProg);   // storage refused: read online this time
+        throw e;
+      }
+    }
+    var tUnpack = performance.now() - t0;
+    var NativeWorker = window.Worker;
+    window.Worker = function (url, o) {
+      var w = new NativeWorker(url, o);
+      if (String(url) === wUrl) { var copy = langRaw.slice().buffer; w.postMessage({ __ocrLang: copy }, [copy]); }
+      return w;
+    };
+    var w;
+    try {
+    w = await Tesseract.createWorker('eng', 1, {
+      workerPath: wUrl, workerBlobURL: false,
+      langPath: 'https://local.invalid/__ocrlang__', gzip: false, cacheMethod: 'none',
+      logger: function (m) {
+        if (!m || !m.status) return;
+        var map = { 'loading tesseract core': 'Starting OCR engine…', 'initializing tesseract': 'Starting OCR engine…', 'loading language traineddata': 'Loading English model…', 'initializing api': 'Starting OCR engine…', 'recognizing text': 'Reading nameplate…' };
+        var base = m.status === 'recognizing text' ? 0.35 : 0.05, span = m.status === 'recognizing text' ? 0.6 : 0.3;
+        progSink(map[m.status] || m.status, base + span * (m.progress || 0));
+      },
+      errorHandler: function (e) { console.warn('[ocr]', e); }
+    });
+    } finally { window.Worker = NativeWorker; }
+    worker = w; workerKey = key;
+    return { w: w, variant: key, fresh: true, tUnpack: tUnpack, tInit: performance.now() - t0 - tUnpack };
+  }
+  async function releaseWorker() { if (worker) { try { await worker.terminate(); } catch (e) {} } worker = null; workerKey = ''; }
+
+  // ---------- image handling ----------
+  var src = null;      // canvas, original photo downscaled to <= 3200 px (never stored anywhere)
+  var rot = 0, crop = null, photoInfo = {};
+  var SRC_MAX = 3200;
+  function loadFile(f) {
+    if (!f) return;
+    clearErr(); $('cReview').classList.add('hide'); $('cDebug').classList.add('hide');
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function () {
+      var s = Math.min(1, SRC_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      photoInfo = { name: f.name || '', bytes: f.size, type: f.type, origW: img.naturalWidth, origH: img.naturalHeight, workW: c.width, workH: c.height };
+      src = c; rot = 0; crop = null; quad = null; rotCache = null;
+      $('cCrop').classList.remove('hide');
+      if (autoRead) {
+        autoRead = false; setMode('vg'); rotCache = rotated(); rotCache._rot = rot; rotCache._src = src;
+        var found = detectPlate();
+        quad = found || null; drawCrop();
+        if (found) { crumb('photo: plate found, reading'); readVG().then(function () { crumb('read done'); }); return; }
+        crumb('photo: plate not found');
+        showErr('The plate edges were not found automatically — drag the 4 amber corners onto the plate, then tap Read Nameplate.');
+      } else drawCrop();
+      $('cCrop').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); showErr(/hei[cf]/i.test((f.type || '') + f.name) ? 'This is an iPhone HEIC photo, which Chrome on Android cannot open. Use Scan plate, take a new photo, or choose a JPEG.' : 'Could not read that image. Try Scan plate or take a new photo.'); };
+    img.src = url;
+  }
+  function rotated() {
+    if (!src) return null;
+    if (!rot) return src;
+    var c = document.createElement('canvas'), q = rot % 180 !== 0;
+    c.width = q ? src.height : src.width; c.height = q ? src.width : src.height;
+    var g = c.getContext('2d');
+    g.translate(c.width / 2, c.height / 2); g.rotate(rot * Math.PI / 180);
+    g.drawImage(src, -src.width / 2, -src.height / 2);
+    return c;
+  }
+  var rotCache = null;
+  function drawCrop() {
+    if (!rotCache || rotCache._rot !== rot || rotCache._src !== src) { rotCache = rotated(); rotCache._rot = rot; rotCache._src = src; }
+    var cv = $('cropCv'), r = rotCache;
+    var scale = Math.min(1, 1400 / Math.max(r.width, r.height));
+    cv.width = Math.round(r.width * scale); cv.height = Math.round(r.height * scale);
+    cv._scale = scale;
+    var g = cv.getContext('2d');
+    g.drawImage(r, 0, 0, cv.width, cv.height);
+    if (crop) {
+      var x = crop.x * scale, y = crop.y * scale, w = crop.w * scale, h = crop.h * scale;
+      g.fillStyle = 'rgba(0,0,0,.55)';
+      g.fillRect(0, 0, cv.width, y); g.fillRect(0, y + h, cv.width, cv.height - y - h);
+      g.fillRect(0, y, x, h); g.fillRect(x + w, y, cv.width - x - w, h);
+      g.strokeStyle = '#f59e0b'; g.lineWidth = Math.max(2, cv.width / 300); g.strokeRect(x, y, w, h);
+    }
+    if (mode === 'vg') drawQuad(g, scale, cv);
+  }
+  (function cropInput() {
+    var cv = $('cropCv'), start = null;
+    function pt(e) {
+      var b = cv.getBoundingClientRect(), s = cv._scale || 1;
+      var x = (e.clientX - b.left) * (cv.width / b.width) / s, y = (e.clientY - b.top) * (cv.height / b.height) / s;
+      return { x: Math.max(0, Math.min(rotCache.width, x)), y: Math.max(0, Math.min(rotCache.height, y)) };
+    }
+    var drag = -1;
+    cv.addEventListener('pointerdown', function (e) {
+      if (!rotCache) return; cv.setPointerCapture(e.pointerId);
+      if (mode === 'vg') { var p0 = pt(e), bd = 1e18; quad.forEach(function (q, i) { var d = (q.x - p0.x) * (q.x - p0.x) + (q.y - p0.y) * (q.y - p0.y); if (d < bd) { bd = d; drag = i; } }); quad[drag] = p0; drawCrop(); return; }
+      start = pt(e); crop = null; drawCrop();
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (mode === 'vg') { if (drag >= 0) { quad[drag] = pt(e); drawCrop(); } return; }
+      if (!start) return; var p = pt(e);
+      crop = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+      drawCrop();
+    });
+    function end() { if (drag >= 0) { drag = -1; drawCrop(); return; } if (!start) return; start = null; if (crop && (crop.w < 30 || crop.h < 20)) crop = null; drawCrop(); }
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  })();
+
+  // ---------- Vogelsang scanner box ----------
+  var mode = 'vg', quad = null;
+  var PW = 1500, PH = 1250;   // straightened plate (template ratio ~1.2 : 1)
+  var ZONES = {               // fractions of the plate, from the VX/VY/XRP/XRC/XRG manuals
+    text: { x: 0.01, y: 0.21, w: 0.55, h: 0.55, label: 'Model & Serial' },
+    year: { x: 0.55, y: 0.36, w: 0.42, h: 0.32, label: 'Year' }
+  };
+  // ---- QR code (top-right of the plate): holds the exact serial, error-checked by the QR code itself ----
+  var QRZONE = { x: 0.50, y: 0.00, w: 0.48, h: 0.50 };
+// Shared QR helpers (same code goes into the bench)
+function qrShrink(g, w, h, k) { // area-average downscale of a grey Uint8 array by factor k (<1)
+  var W = Math.max(1, Math.round(w * k)), H = Math.max(1, Math.round(h * k)), o = new Uint8ClampedArray(W * H);
+  for (var y = 0; y < H; y++) { var y0 = Math.floor(y / k), y1 = Math.min(h, Math.floor((y + 1) / k)); if (y1 <= y0) y1 = y0 + 1;
+    for (var x = 0; x < W; x++) { var x0 = Math.floor(x / k), x1 = Math.min(w, Math.floor((x + 1) / k)); if (x1 <= x0) x1 = x0 + 1; var s = 0, n = 0;
+      for (var yy = y0; yy < y1; yy++) for (var xx = x0; xx < x1; xx++) { s += g[yy * w + xx]; n++; } o[y * W + x] = s / n; } }
+  return { g: o, w: W, h: H };
+}
+function qrBlur(im) { var w = im.w, h = im.h, g = im.g, o = new Uint8ClampedArray(w * h);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { var s = 0, n = 0;
+    for (var dy = -1; dy <= 1; dy++) { var yy = y + dy; if (yy < 0 || yy >= h) continue; for (var dx = -1; dx <= 1; dx++) { var xx = x + dx; if (xx < 0 || xx >= w) continue; s += g[yy * w + xx]; n++; } }
+    o[y * w + x] = s / n; }
+  return { g: o, w: w, h: h }; }
+function qrMedian(im) { var w = im.w, h = im.h, g = im.g, o = new Uint8ClampedArray(w * h), a = new Array(9);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { var n = 0;
+    for (var dy = -1; dy <= 1; dy++) { var yy = Math.min(h - 1, Math.max(0, y + dy)); for (var dx = -1; dx <= 1; dx++) { var xx = Math.min(w - 1, Math.max(0, x + dx)); a[n++] = g[yy * w + xx]; } }
+    a.sort(function (p, q) { return p - q; }); o[y * w + x] = a[4]; }
+  return { g: o, w: w, h: h }; }
+function qrRGBA(im) { var d = new Uint8ClampedArray(im.w * im.h * 4); for (var i = 0, j = 0; i < im.g.length; i++, j += 4) { d[j] = d[j + 1] = d[j + 2] = im.g[i]; d[j + 3] = 255; } return d; }
+function qrSerial(t) { var m = /vogelsang\.info\/app\/\d+\/[^\/\s]+\/([A-Z]{3}\.\d{4}\.\d{4}|\d{11})\b/i.exec(t || ''); return m ? m[1].toUpperCase() : null; }
+// variants, cheapest first; each is {g,w,h}
+function qrVariants(g, w, h) {
+  var out = [], ks = [0.5, 0.36, 0.7, 0.27];
+  ks.forEach(function (k) { var s = qrShrink(g, w, h, k); out.push(['s' + k, s]); out.push(['s' + k + 'm', qrMedian(s)]); out.push(['s' + k + 'b', qrBlur(qrBlur(s))]); });
+  return out;
+}
+  var QR_ORDER = ['s0.5', 's0.5m', 's0.36b', 's0.36', 's0.5b', 's0.7m', 's0.27'];
+  var qrNative = null, qrLib = null;
+  async function qrNativeDetector() {
+    if (qrNative !== null) return qrNative;
+    qrNative = false;
+    try { if ('BarcodeDetector' in window) { var f = await BarcodeDetector.getSupportedFormats(); if (f.indexOf('qr_code') >= 0) qrNative = new BarcodeDetector({ formats: ['qr_code'] }); } } catch (e) { qrNative = false; }
+    return qrNative;
+  }
+  async function qrLibLoad() {
+    if (window.jsQR) return window.jsQR;
+    if (qrLib) return qrLib;
+    qrLib = (async function () { try { if (!document.getElementById('a-worker') && window.caches) { await scriptFromBytes(await packGet(packFiles(false)[4], true)); if (window.jsQR) return window.jsQR; } } catch (e) {} for (var i = 0; i < CDNS.length; i++) { try { await loadScript(CDNS[i] + 'jsqr@1.4.0/dist/jsQR.js'); if (window.jsQR) return window.jsQR; } catch (e) {} } qrLib = null; return null; })();
+    return qrLib;
+  }
+  function qrVariant(base, name) {
+    var m = /^s([0-9.]+)([mb]?)$/.exec(name), im = qrShrink(base.g, base.w, base.h, parseFloat(m[1]));
+    return m[2] === 'm' ? qrMedian(im) : m[2] === 'b' ? qrBlur(qrBlur(im)) : im;
+  }
+  // up to 3 image variants per frame (rotating through the list frame by frame), stops at the first hit
+  async function readQR(plate, frameNo) {
+    var t0 = performance.now(), info = { serial: null, via: null, tries: 0, ms: 0 };
+    try {
+      var x0 = Math.round(PW * QRZONE.x), y0 = Math.round(PH * QRZONE.y), w = Math.round(PW * QRZONE.w), h = Math.round(PH * QRZONE.h);
+      var d = plate.getContext('2d', { willReadFrequently: true }).getImageData(x0, y0, w, h).data, g = new Uint8ClampedArray(w * h);
+      for (var i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000;
+      var base = { g: g, w: w, h: h }, L = QR_ORDER.length, a = 1 + (frameNo * 2) % (L - 1), names = [QR_ORDER[0], QR_ORDER[a], QR_ORDER[1 + a % (L - 1)]];
+      names = names.filter(function (n, i, arr) { return arr.indexOf(n) === i; });
+      var nat = await qrNativeDetector(), lib = nat ? null : await qrLibLoad();
+      for (var n = 0; n < names.length && !info.serial; n++) {
+        var im = qrVariant(base, names[n]); info.tries++;
+        if (nat) {
+          var c = document.createElement('canvas'); c.width = im.w; c.height = im.h; c.getContext('2d').putImageData(new ImageData(qrRGBA(im), im.w, im.h), 0, 0);
+          try { var r = await nat.detect(c); for (var q = 0; q < r.length; q++) { var sv = qrSerial(r[q].rawValue); if (sv) { info.serial = sv; info.via = 'native ' + names[n]; break; } } } catch (e) { nat = null; qrNative = false; lib = await qrLibLoad(); }
+        }
+        if (!info.serial && !nat && lib) { var rr = lib(qrRGBA(im), im.w, im.h, { inversionAttempts: 'attemptBoth' }); var sv2 = rr && qrSerial(rr.data); if (sv2) { info.serial = sv2; info.via = 'jsQR ' + names[n]; } }
+      }
+    } catch (e) { info.err = String(e && e.message || e); }
+    info.ms = Math.round(performance.now() - t0); crumb('qr: ' + JSON.stringify(info));
+    return info;
+  }
+  function defaultQuad() {
+    var w = rotCache.width, h = rotCache.height, pw = w * 0.72, ph = pw / 1.2;
+    if (ph > h * 0.72) { ph = h * 0.72; pw = ph * 1.2; }
+    var x0 = (w - pw) / 2, y0 = (h - ph) / 2;
+    return [{ x: x0, y: y0 }, { x: x0 + pw, y: y0 }, { x: x0 + pw, y: y0 + ph }, { x: x0, y: y0 + ph }];
+  }
+  // Find the black plate automatically (dark, low-colour pixels; largest blob) — the user can still drag the corners.
+  function detectPlate(maxFrac) {
+    maxFrac = maxFrac || 0.85;
+    var r = rotCache, k = Math.min(1, 360 / Math.max(r.width, r.height)), w = Math.round(r.width * k), h = Math.round(r.height * k);
+    var c = document.createElement('canvas'); c.width = w; c.height = h; var g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(r, 0, 0, w, h);
+    var d = g.getImageData(0, 0, w, h).data, m = new Uint8Array(w * h);
+    for (var i = 0; i < w * h; i++) { var R = d[i * 4], G = d[i * 4 + 1], B = d[i * 4 + 2], mx = Math.max(R, G, B), mn = Math.min(R, G, B); m[i] = (mx < 95 && (mx - mn) < 0.5 * mx + 12) ? 1 : 0; }
+    var dl = new Uint8Array(w * h), rad = 3;  // close small gaps (text, QR) so the plate is one blob
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { if (!m[y * w + x]) continue; for (var yy = Math.max(0, y - rad); yy <= Math.min(h - 1, y + rad); yy++) for (var xx = Math.max(0, x - rad); xx <= Math.min(w - 1, x + rad); xx++) dl[yy * w + xx] = 1; }
+    var lab = new Int32Array(w * h), best = null, n = 0, st = [];
+    for (i = 0; i < w * h; i++) {
+      if (!dl[i] || lab[i]) continue; n++; st.push(i); lab[i] = n;
+      var area = 0, a1 = 1e9, a2 = -1e9, b1 = 1e9, b2 = -1e9, p1, p2, p3, p4, edge = 0;
+      while (st.length) { var q = st.pop(), qx = q % w, qy = (q / w) | 0; area++;
+        if (qx === 0 || qy === 0 || qx === w - 1 || qy === h - 1) edge++;
+        var s1 = qx + qy, s2 = qx - qy;
+        if (s1 < a1) { a1 = s1; p1 = [qx, qy]; } if (s1 > a2) { a2 = s1; p3 = [qx, qy]; } if (s2 > b2) { b2 = s2; p2 = [qx, qy]; } if (s2 < b1) { b1 = s2; p4 = [qx, qy]; }
+        [q - 1, q + 1, q - w, q + w].forEach(function (z) { if (z >= 0 && z < w * h && dl[z] && !lab[z] && Math.abs((z % w) - qx) <= 1) { lab[z] = n; st.push(z); } }); }
+      if (area > w * h * 0.04 && area < w * h * maxFrac && edge < (w + h) * (maxFrac > 0.9 ? 2.5 : 0.6) && (!best || area > best.area)) best = { area: area, pts: [p1, p2, p3, p4] };
+    }
+    if (!best) return null;
+    var inset = rad * 0.7;  // undo the gap-closing growth
+    var cx = 0, cy = 0; best.pts.forEach(function (p) { cx += p[0] / 4; cy += p[1] / 4; });
+    return best.pts.map(function (p) { var dx = cx - p[0], dy = cy - p[1], L = Math.hypot(dx, dy) || 1; return { x: (p[0] + dx / L * inset) / k, y: (p[1] + dy / L * inset) / k }; });
+  }
+  function orderQuad(q) {    // TL, TR, BR, BL whatever order the corners were dragged into
+    var cx = 0, cy = 0; q.forEach(function (p) { cx += p.x / 4; cy += p.y / 4; });
+    var s = q.slice().sort(function (a, b) { return Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx); });
+    var k = 0, best = 1e18; s.forEach(function (p, i) { if (p.x + p.y < best) { best = p.x + p.y; k = i; } });
+    return [0, 1, 2, 3].map(function (i) { return s[(k + i) % 4]; });
+  }
+  function solve(A, b) {     // Gaussian elimination, 8x8
+    var n = b.length, M = A.map(function (r, i) { return r.concat([b[i]]); });
+    for (var c = 0; c < n; c++) {
+      var piv = c; for (var r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      var t = M[c]; M[c] = M[piv]; M[piv] = t;
+      for (r = 0; r < n; r++) if (r !== c) { var f = M[r][c] / M[c][c]; for (var k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+    }
+    return M.map(function (r, i) { return r[n] / r[i]; });
+  }
+  function homography(from, to) {  // maps from[i] -> to[i]
+    var A = [], b = [];
+    for (var i = 0; i < 4; i++) {
+      var x = from[i].x, y = from[i].y, u = to[i].x, v = to[i].y;
+      A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+      A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+    }
+    var h = solve(A, b); h.push(1); return h;
+  }
+  function apply(h, x, y) { var d = h[6] * x + h[7] * y + h[8]; return { x: (h[0] * x + h[1] * y + h[2]) / d, y: (h[3] * x + h[4] * y + h[5]) / d }; }
+  function plateToImage() { var q = orderQuad(quad); return homography([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], q); }
+  function drawQuad(g, sc, cv) {
+    if (!quad) { quad = detectPlate() || defaultQuad(); }
+    var H = plateToImage(), lw = Math.max(2, cv.width / 260);
+    function poly(pts, stroke, fill) { g.beginPath(); pts.forEach(function (p, i) { var P = apply(H, p.x, p.y); i ? g.lineTo(P.x * sc, P.y * sc) : g.moveTo(P.x * sc, P.y * sc); }); g.closePath(); if (fill) { g.fillStyle = fill; g.fill(); } g.strokeStyle = stroke; g.lineWidth = lw; g.stroke(); }
+    poly([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], '#f59e0b');
+    Object.keys(ZONES).forEach(function (k) {
+      var z = ZONES[k]; poly([{ x: z.x, y: z.y }, { x: z.x + z.w, y: z.y }, { x: z.x + z.w, y: z.y + z.h }, { x: z.x, y: z.y + z.h }], '#38bdf8', 'rgba(56,189,248,.16)');
+      var P = apply(H, z.x, z.y); g.fillStyle = '#38bdf8'; g.font = 'bold ' + Math.round(cv.width / 32) + 'px sans-serif'; g.fillText(z.label, P.x * sc + 4, P.y * sc - 6);
+    });
+    var r = Math.max(10, cv.width / 34);
+    quad.forEach(function (p) { g.beginPath(); g.arc(p.x * sc, p.y * sc, r, 0, 7); g.fillStyle = 'rgba(245,158,11,.35)'; g.fill(); g.lineWidth = lw; g.strokeStyle = '#f59e0b'; g.stroke(); g.beginPath(); g.arc(p.x * sc, p.y * sc, lw * 1.2, 0, 7); g.fillStyle = '#fff'; g.fill(); });
+  }
+  function warpPlate() {     // straighten the plate into a PW x PH canvas (bilinear)
+    var H = plateToImage(), r = rotCache, sw = r.width, sh = r.height;
+    var sd = r.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
+    var c = document.createElement('canvas'); c.width = PW; c.height = PH;
+    var g = c.getContext('2d'), im = g.createImageData(PW, PH), d = im.data, o = 0;
+    for (var y = 0; y < PH; y++) {
+      var v = (y + 0.5) / PH;
+      for (var x = 0; x < PW; x++, o += 4) {
+        var u = (x + 0.5) / PW, dd = H[6] * u + H[7] * v + H[8];
+        var sx = (H[0] * u + H[1] * v + H[2]) / dd - 0.5, sy = (H[3] * u + H[4] * v + H[5]) / dd - 0.5;
+        var x0 = Math.floor(sx), y0 = Math.floor(sy), fx = sx - x0, fy = sy - y0;
+        if (x0 < 0 || y0 < 0 || x0 >= sw - 1 || y0 >= sh - 1) { d[o] = d[o + 1] = d[o + 2] = 0; d[o + 3] = 255; continue; }
+        var i00 = (y0 * sw + x0) * 4, i10 = i00 + 4, i01 = i00 + sw * 4, i11 = i01 + 4;
+        for (var ch = 0; ch < 3; ch++) d[o + ch] = (sd[i00 + ch] * (1 - fx) + sd[i10 + ch] * fx) * (1 - fy) + (sd[i01 + ch] * (1 - fx) + sd[i11 + ch] * fx) * fy;
+        d[o + 3] = 255;
+      }
+    }
+    g.putImageData(im, 0, 0); return c;
+  }
+  function zoneCanvas(plate, z, opt) { // crop zone, grey, dark-plate -> black text on white, contrast
+    var x = Math.round(z.x * PW), y = Math.round(z.y * PH), w = Math.round(z.w * PW), h = Math.round(z.h * PH);
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(plate, x, y, w, h, 0, 0, w, h);
+    var im = g.getImageData(0, 0, w, h), d = im.data, n = w * h, hist = new Uint32Array(256), sum = 0;
+    for (var i = 0; i < d.length; i += 4) { var v = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = v; sum += v; }
+    var inv = opt.invert || sum / n < 128;
+    for (i = 0; i < d.length; i += 4) { if (inv) d[i] = 255 - d[i]; }
+    // Even out glare / shadows: divide each pixel by its local background (box mean via integral image)
+    var R = Math.max(15, Math.round(Math.min(w, h) / 8)), I = new Float64Array((w + 1) * (h + 1));
+    for (var yy = 0; yy < h; yy++) { var rs = 0; for (var xx = 0; xx < w; xx++) { rs += d[(yy * w + xx) * 4]; I[(yy + 1) * (w + 1) + xx + 1] = I[yy * (w + 1) + xx + 1] + rs; } }
+    var flat = new Uint8ClampedArray(n);
+    for (yy = 0; yy < h; yy++) { var y0 = Math.max(0, yy - R), y1 = Math.min(h, yy + R + 1); for (xx = 0; xx < w; xx++) {
+      var x0 = Math.max(0, xx - R), x1 = Math.min(w, xx + R + 1), m = (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0));
+      flat[yy * w + xx] = d[(yy * w + xx) * 4] * 235 / Math.max(1, m); } }
+    for (i = 0; i < n; i++) { d[i * 4] = flat[i]; hist[flat[i]]++; }
+    var lo = 0, hi = 255, acc = 0;
+    for (lo = 0; lo < 255; lo++) { acc += hist[lo]; if (acc > n * 0.01) break; }
+    acc = 0; for (hi = 255; hi > 0; hi--) { acc += hist[hi]; if (acc > n * 0.02) break; }
+    if (hi - lo < 20) { lo = 0; hi = 255; }
+    var thr = -1;
+    if (opt.bin) { var s2 = 0; for (var t = 0; t < 256; t++) s2 += t * hist[t]; var sB = 0, wB = 0, best = 0; for (t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; var wF = n - wB; if (!wF) break; sB += t * hist[t]; var mB = sB / wB, mF = (s2 - sB) / wF, bt = wB * wF * (mB - mF) * (mB - mF); if (bt > best) { best = bt; thr = t; } } }
+    for (i = 0; i < d.length; i += 4) { var g0 = d[i], out = thr >= 0 ? (g0 > thr ? 255 : 0) : Math.max(0, Math.min(255, (g0 - lo) * 255 / (hi - lo))); d[i] = d[i + 1] = d[i + 2] = out; d[i + 3] = 255; }
+    g.putImageData(im, 0, 0); c._ox = x; c._oy = y; c._inv = inv; return c;
+  }
+  function linesOf(res) { var L = []; (res.data.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { L.push({ text: l.text, confidence: l.confidence, bbox: l.bbox, words: (l.words || []).map(function (w) { return { text: w.text, confidence: w.confidence, bbox: w.bbox }; }) }); }); }); }); return L; }
+  async function reread(w, zc, line, re) { // second pass on one line: single-line mode, letters/digits only
+    if (!line || !line.bbox) return null;
+    var b = line.bbox, pad = 8, x = Math.max(0, b.x0 - pad), y = Math.max(0, b.y0 - pad), ww = Math.min(zc.width - x, b.x1 - b.x0 + 2 * pad), hh = Math.min(zc.height - y, b.y1 - b.y0 + 2 * pad);
+    var c = document.createElement('canvas'), k = Math.min(3, Math.max(1, 70 / Math.max(1, b.y1 - b.y0)));
+    c.width = Math.round(ww * k); c.height = Math.round(hh * k);
+    var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingQuality = 'high'; g.drawImage(zc, x, y, ww, hh, 0, 0, c.width, c.height);
+    await w.setParameters({ tessedit_pageseg_mode: '7', tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-' });
+    var r = await w.recognize(c, {}, { text: true, blocks: true });
+    await w.setParameters({ tessedit_char_whitelist: '' });
+    var t = norm(r.data.text), m = t.match(re);
+    return m ? { value: m[1], conf: Math.round(r.data.confidence) } : null;
+  }
+  function norm(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
+
+  // Split a zone into text lines (rows with dark pixels), so each line is read on its own.
+  function segmentLines(zc) {
+    var w = zc.width, h = zc.height, d = zc.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+    var rows = new Uint32Array(h);
+    for (var y = 0; y < h; y++) { var c = 0; for (var x = 0; x < w; x++) if (d[(y * w + x) * 4] < 110) c++; rows[y] = c; }
+    // background level = 20th percentile of the row counts (a dark edge or shadow raises every row)
+    var sorted = Array.prototype.slice.call(rows).sort(function (a, b) { return a - b; }), base = sorted[Math.floor(h * 0.2)] || 0;
+    var thr = base + Math.max(4, w * 0.012), bands = [], st = -1, gap = 0;
+    for (y = 0; y <= h; y++) {
+      var on = y < h && rows[y] > thr;
+      if (on) { if (st < 0) st = y; gap = 0; }
+      else if (st >= 0) { gap++; if (gap > 3 || y === h) { bands.push([st, y - gap + 1]); st = -1; gap = 0; } }
+    }
+    bands = bands.filter(function (b) { return b[1] - b[0] >= 14; });
+    // a block much taller than one text line is several lines stuck together: split it at its quietest rows
+    var maxLine = h * 0.13;
+    for (var guard = 0; guard < 12; guard++) {
+      var bi = bands.findIndex(function (b) { return b[1] - b[0] > maxLine; });
+      if (bi < 0) break;
+      var b0 = bands[bi], lo = b0[0] + Math.round((b0[1] - b0[0]) * 0.2), hi2 = b0[1] - Math.round((b0[1] - b0[0]) * 0.2), cut = lo;
+      for (y = lo; y <= hi2; y++) if (rows[y] < rows[cut]) cut = y;
+      bands.splice(bi, 1, [b0[0], cut], [cut + 1, b0[1]]);
+      bands = bands.filter(function (b) { return b[1] - b[0] >= 14; });
+    }
+    return bands.map(function (b) {
+      var y0 = Math.max(0, b[0] - 8), y1 = Math.min(h, b[1] + 8), cols = [];
+      for (var x = 0; x < w; x++) { var c = 0; for (var y = b[0]; y < b[1]; y++) if (d[(y * w + x) * 4] < 110) c++; cols.push(c); }
+      var x0 = 0, x1 = w - 1; while (x0 < w && cols[x0] < 2) x0++; while (x1 > 0 && cols[x1] < 2) x1--;
+      return { x0: Math.max(0, x0 - 12), x1: Math.min(w, x1 + 12), y0: y0, y1: y1 };
+    }).filter(function (b) { return b.x1 - b.x0 > 30; });
+  }
+  // Straighten a slightly tilted zone: try -5°..+5° and keep the angle where the text rows are sharpest.
+  function deskew(zc) {
+    var k = Math.min(1, 320 / zc.width), w = Math.round(zc.width * k), h = Math.round(zc.height * k);
+    var t = document.createElement('canvas'); t.width = w; t.height = h; var tg = t.getContext('2d', { willReadFrequently: true });
+    var best = 0, bestScore = -1;
+    for (var a = -5; a <= 5.001; a += 0.5) {
+      tg.fillStyle = '#fff'; tg.fillRect(0, 0, w, h); tg.save(); tg.translate(w / 2, h / 2); tg.rotate(a * Math.PI / 180); tg.drawImage(zc, -w / 2, -h / 2, w, h); tg.restore();
+      var d = tg.getImageData(0, 0, w, h).data, sum = 0, sq = 0;
+      for (var y = 0; y < h; y++) { var c = 0; for (var x = 0; x < w; x++) if (d[(y * w + x) * 4] < 110) c++; sum += c; sq += c * c; }
+      var score = sq / h - (sum / h) * (sum / h);   // variance of the row profile: highest when lines are level
+      if (score > bestScore) { bestScore = score; best = a; }
+    }
+    if (Math.abs(best) < 0.5) { zc._skew = 0; return zc; }
+    var o = document.createElement('canvas'); o.width = zc.width; o.height = zc.height; var g = o.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height); g.translate(o.width / 2, o.height / 2); g.rotate(best * Math.PI / 180); g.drawImage(zc, -zc.width / 2, -zc.height / 2);
+    o._ox = zc._ox; o._oy = zc._oy; o._inv = zc._inv; o._skew = best; return o;
+  }
+  function binarized(zc) { // second look: light blur + Otsu threshold
+    var w = zc.width, h = zc.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d', { willReadFrequently: true }); g.filter = 'blur(1px)'; g.drawImage(zc, 0, 0); g.filter = 'none';
+    var im = g.getImageData(0, 0, w, h), d = im.data, hist = new Uint32Array(256), n = w * h;
+    for (var i = 0; i < d.length; i += 4) hist[d[i]]++;
+    var sum = 0; for (var t = 0; t < 256; t++) sum += t * hist[t];
+    var sB = 0, wB = 0, best = 0, thr = 128;
+    for (t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; var wF = n - wB; if (!wF) break; sB += t * hist[t]; var mB = sB / wB, mF = (sum - sB) / wF, bt = wB * wF * (mB - mF) * (mB - mF); if (bt > best) { best = bt; thr = t; } }
+    for (i = 0; i < d.length; i += 4) { var v = d[i] > thr ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = v; }
+    g.putImageData(im, 0, 0); return c;
+  }
+  function thinned(zc) { // third look: dark strokes made thinner (3x3 max filter) so bold 8/9/0 separate
+    var w = zc.width, h = zc.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d', { willReadFrequently: true }); var src = zc.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+    var im = g.createImageData(w, h), d = im.data;
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { var m = 0; for (var dy = -1; dy <= 1; dy++) { var yy = Math.min(h - 1, Math.max(0, y + dy)); for (var dx = -1; dx <= 1; dx++) { var xx = Math.min(w - 1, Math.max(0, x + dx)), v = src[(yy * w + xx) * 4]; if (v > m) m = v; } } var o = (y * w + x) * 4; d[o] = d[o + 1] = d[o + 2] = m; d[o + 3] = 255; }
+    g.putImageData(im, 0, 0); return c;
+  }
+  function fixedThreshold(zc, t) {
+    var w = zc.width, h = zc.height, c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(zc, 0, 0);
+    var im = g.getImageData(0, 0, w, h), d = im.data;
+    for (var i = 0; i < d.length; i += 4) { var v = d[i] > t ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = v; }
+    g.putImageData(im, 0, 0); return c;
+  }
+  function cropScale(src, x, y, w, h, k) {
+    var pad = 20, c = document.createElement('canvas'); c.width = Math.round(w * k) + 2 * pad; c.height = Math.round(h * k) + 2 * pad;
+    var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingQuality = 'high';
+    g.drawImage(src, x, y, w, h, pad, pad, Math.round(w * k), Math.round(h * k)); return c;
+  }
+  // Many reads of one image region under different settings; returns the texts.
+  // Stops early once the first 4 reads agree on the same valid value (saves several seconds on a phone).
+  async function multiRead(w, jobs, psm, whitelist, job, valueOf) {
+    await w.setParameters({ tessedit_pageseg_mode: psm, preserve_interword_spaces: '1', tessedit_char_whitelist: whitelist || '' });
+    var out = [];
+    for (var i = 0; i < jobs.length; i++) {
+      if (job.cancelled) return out;
+      var r = await w.recognize(jobs[i], {}, { text: true }); out.push({ text: r.data.text, conf: r.data.confidence });
+      if (valueOf && out.length === 4) { var vs = out.map(function (o) { return valueOf(o.text); }); if (vs[0] && vs.every(function (v) { return v === vs[0]; })) { out.early = true; return out; } }
+    }
+    return out;
+  }
+  // Strict majority: "Looks clear" only when at least 3 reads and 70% of the reads that found a value agree.
+  function tallyField(values, what) {
+    var t = {}, n = 0; values.forEach(function (v) { if (!v) return; n++; t[v] = (t[v] || 0) + 1; });
+    var keys = Object.keys(t).sort(function (a, b) { return t[b] - t[a]; });
+    if (!keys.length) return null;
+    var top = keys[0], c = t[top], share = c / n;
+    var ok = c >= 3 && share >= 0.7;
+    return { value: top, votes: c, of: values.length, found: n, ok: ok,
+      reason: c + ' of ' + values.length + ' independent reads give ' + top + (keys.length > 1 ? ' (others: ' + keys.slice(1).map(function (k) { return k + ' ×' + t[k]; }).join(', ') + ')' : '') + (ok ? '.' : ' — not unanimous enough, check against the plate.'),
+      alternatives: keys.slice(1).map(function (k) { return { value: k, label: t[k] + ' read(s)', line: null, conf: null }; }) };
+  }
+  function lineCanvas(src, b) {
+    var pad = 14, c = document.createElement('canvas'), w = b.x1 - b.x0, h = b.y1 - b.y0, k = Math.min(2.5, Math.max(1, 64 / h));
+    c.width = Math.round((w + 2 * pad) * k); c.height = Math.round((h + 2 * pad) * k);
+    var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingQuality = 'high';
+    g.drawImage(src, b.x0, b.y0, w, h, pad * k, pad * k, w * k, h * k); return c;
+  }
+  async function readLines(w, zc, bands, whitelist) {
+    await w.setParameters({ tessedit_pageseg_mode: '7', preserve_interword_spaces: '1', tessedit_char_whitelist: whitelist || '' });
+    var out = [];
+    for (var i = 0; i < bands.length; i++) {
+      var r = await w.recognize(lineCanvas(zc, bands[i]), {}, { text: true, blocks: true });
+      var words = []; (r.data.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { (l.words || []).forEach(function (x) { words.push({ text: x.text, confidence: x.confidence }); }); }); }); });
+      out.push({ text: norm(r.data.text), confidence: r.data.confidence, words: words, band: bands[i] });
+    }
+    return out;
+  }
+  // Combine two independent reads of the same plate: agree -> trusted; disagree -> "Check" with both shown.
+  // Year box: sparse-text read (finds each word wherever it is), words grouped back into rows.
+  async function readRows(w, zc, whitelist) {
+    await w.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: whitelist || '' });
+    var r = await w.recognize(zc, {}, { text: true, blocks: true }), words = [];
+    (r.data.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { (l.words || []).forEach(function (x) { if (norm(x.text)) words.push({ text: norm(x.text), confidence: x.confidence, bbox: x.bbox }); }); }); }); });
+    words.sort(function (a, b) { return a.bbox.y0 - b.bbox.y0; });
+    var rows = [];
+    words.forEach(function (x) {
+      var cy = (x.bbox.y0 + x.bbox.y1) / 2, hgt = x.bbox.y1 - x.bbox.y0;
+      var row = rows.find(function (r) { return Math.abs(r.cy - cy) < Math.max(hgt, r.h) * 0.6; });
+      if (!row) { row = { cy: cy, h: hgt, words: [] }; rows.push(row); }
+      row.words.push(x);
+    });
+    return rows.map(function (r) {
+      r.words.sort(function (a, b) { return a.bbox.x0 - b.bbox.x0; });
+      return { text: r.words.map(function (x) { return x.text; }).join(' '), confidence: r.words.reduce(function (a, x) { return a + x.confidence; }, 0) / r.words.length, words: r.words, cy: r.cy, h: r.h };
+    });
+  }
+  function dropWeightRows(rows, ref) { // digits-only read cannot see "kg": blank the rows that are weight rows in the normal read
+    var kg = ref.filter(function (r) { return /kg/i.test(r.text); });
+    return rows.map(function (r) { return kg.some(function (k) { return Math.abs(k.cy - r.cy) < Math.max(k.h, r.h) * 0.6; }) ? { text: '', confidence: 0, words: [] } : r; });
+  }
+
+  // Majority of independent reads: 2+ agree -> trusted; otherwise "Check" with the others shown.
+  function vote(list, field) {
+    var got = list.map(function (r) { return r[field]; }).filter(function (f) { return f && f.value; });
+    if (!got.length) return list[0][field];
+    if (got.some(function (f) { return !f.weak; })) got = got.filter(function (f) { return !f.weak; });
+    var tally = {};
+    got.forEach(function (f) { var k = f.value; tally[k] = tally[k] || { n: 0, best: f, fixedAll: true }; tally[k].n++; if ((f.conf || 0) > (tally[k].best.conf || 0)) tally[k].best = f; if (!f.fixed) tally[k].fixedAll = false; });
+    var keys = Object.keys(tally).sort(function (a, b) { return tally[b].n - tally[a].n || (tally[b].best.conf || 0) - (tally[a].best.conf || 0); });
+    var top = tally[keys[0]], b = top.best, others = keys.slice(1).map(function (k) { return { value: k, label: tally[k].n + ' read(s)', line: null, conf: tally[k].best.conf }; });
+    var clean = b.reason.replace(/\. (Check against the plate|Low confidence — check against the plate)\.$/, '');
+    if (top.n >= 2 && keys.length === 1 && !b.weak) return { value: b.value, conf: b.conf, status: 'ok', line: b.line, reason: clean + '. ' + top.n + ' of ' + list.length + ' reads agree.', alternatives: [] };
+    if (top.n >= 2 && !b.weak && top.n > (keys[1] ? tally[keys[1]].n : 0)) return { value: b.value, conf: b.conf, status: top.n >= 3 && top.n >= list.length - 1 ? 'ok' : 'check', line: b.line, reason: clean + '. ' + top.n + ' of ' + list.length + ' reads agree' + (others.length ? ', ' + others.length + ' differ — check.' : '.'), alternatives: others };
+    return { value: b.value, conf: b.conf, status: 'check', line: b.line, reason: (keys.length > 1 ? 'Reads disagree (' + keys.join(' / ') + ')' : 'Only ' + top.n + ' of ' + list.length + ' reads found it') + ' — check against the plate.', alternatives: others };
+  }
+
+  async function readVG(o) {
+    o = o || {};
+    if (!rotCache || (running && !o.silent)) return;
+    if (!o.silent) { clearErr(); setBusy(true); }
+    var opt = { mode: 'vg', invert: $('sInvert').checked, bin: false, engine: $('sEng').value };
+    var T = {}, t0 = performance.now(), job = {}; curJob = job;
+    var P = function (m, v) { if (!job.cancelled) prog(m, v); }; progSink = P;
+    try {
+      var tp = performance.now();
+      crumb('read: preparing image');
+      var plate = warpPlate(), zt = deskew(zoneCanvas(plate, ZONES.text, opt)), zy = deskew(zoneCanvas(plate, ZONES.year, opt));
+      var ztb = binarized(zt), zyb = binarized(zy), ztt = null, zyt = thinned(zy), bt = segmentLines(zt), by = segmentLines(zy);
+      T.preprocess = performance.now() - tp;
+      var tq = performance.now(), qr = o.qrKnown ? { serial: o.qrKnown, via: 'earlier frame', tries: 0, ms: 0 } : await readQR(plate, o.frameNo || 0);
+      T.qr = performance.now() - tq;
+      crumb('read: starting engine');
+      var wk = o.extra ? { w: await getExtraWorker(), variant: 'extra', fresh: false } : await getWorker(opt.engine, P);
+      if (!wk.w) wk = await getWorker(opt.engine, P);
+      if (job.cancelled) return;
+      crumb('read: engine ready (' + wk.variant + ')');
+      if (wk.fresh) { T.unpackAssets = wk.tUnpack; T.startEngine = wk.tInit; }
+      var tr = performance.now();
+      P('Reading model & serial…', 0.4);
+      var lt1 = await readLines(wk.w, zt, bt); if (job.cancelled) return;
+      P('Reading model & serial (second look)…', 0.55);
+      // Light first pass (fast phones and slow phones alike): one read per line only finds WHERE model / serial /
+      // part no. are; the 12-way confirmation below decides the values. A second look only if a line was not found.
+      var empty = function () { return lt1.map(function () { return { text: '', confidence: 0, words: [] }; }); };
+      var ly1 = [], ly2 = [], ly3 = [], ly4 = [];
+      var r1 = NameplateParser.parseVogelsang(lt1, ly1, { maxYear: MAX_YEAR });
+      var lt2 = empty(), lt4 = empty(), lt3 = empty(), r2 = r1, r4 = r1, r3 = r1;
+      if (o.full || !r1.model.value || !r1.serial.value || !r1.partNo.value) {
+        P('Second look…', 0.55);
+        lt2 = await readLines(wk.w, ztb, bt); if (job.cancelled) return;
+        r2 = NameplateParser.parseVogelsang(lt2, ly2, { maxYear: MAX_YEAR });
+      }
+      await wk.w.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '6' });
+      window.__dbg = { lt: [lt1, lt2].map(function (L) { return L.map(function (l) { return l.text + ' [' + Math.round(l.confidence) + ']'; }).join(' | '); }) };
+      var R = r2 === r1 ? [r1] : [r1, r2];
+      var parsed = { model: vote(R, 'model'), serial: vote(R, 'serial'), partNo: vote(R, 'partNo'), year: vote(R, 'year'), notes: { ignored: [], yearLikeNumbers: [] } };
+      // ---- Ensemble: the model line, the serial line and the year box are each read 12 ways ----
+      P('Confirming model, serial & year…', 0.9);
+      var zt150 = fixedThreshold(zt, 150), zy150 = fixedThreshold(zy, 150), V3 = [zt, zt150, ztb], VY = [zy, zy150, zyt];
+      var lineJobs = function (li) { var b = bt[li], jobs = []; if (!b) return jobs; var hgt = b.y1 - b.y0, wd = Math.min(zt.width - b.x0, Math.round((b.x1 - b.x0) * 1.05));
+        [64, 44, 30].forEach(function (th) { V3.forEach(function (v) { jobs.push(cropScale(v, b.x0, b.y0, wd, hgt, th / hgt)); }); }); return jobs.slice(0, 9); };
+      var prodLine = function (li) { return li > 0 && lt1[li - 1] ? lt1[li - 1].text + ' ' + (lt2[li - 1] || {}).text : ''; };
+      var E = {};
+      var ml = parsed.model.line != null ? parsed.model.line : null, sl = parsed.serial.line != null ? parsed.serial.line : null, pnl = parsed.partNo.line != null ? parsed.partNo.line : null;
+      if (ml != null) {
+        var pl = prodLine(ml), mvalid = function (t) { var v = NameplateParser.modelIn(t, pl); return v && NameplateParser.catalogue(v).ok ? v : null; };
+        var mr = await multiRead(wk.w, lineJobs(ml), '7', '', job, mvalid); if (!mr.early) mr = mr.concat(await multiRead(wk.w, lineJobs(ml).slice(0, 3), '7', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-', job));
+        var raw = mr.map(function (r) { return NameplateParser.modelIn(r.text, pl); });
+        var valid = raw.map(function (v) { return v && NameplateParser.catalogue(v).ok ? v : null; });
+        var dropped = raw.filter(function (v, i) { return v && !valid[i]; });
+        E.model = tallyField(valid);
+        if (E.model) { if (dropped.length) E.model.reason += ' Ignored ' + dropped.length + ' read(s) that are not catalogue models (' + dropped.filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ') + ').'; E.model.reason += ' ' + E.model.value + ': ' + NameplateParser.catalogue(E.model.value).why + '.'; E.model.alternatives = []; }
+        else { var any = tallyField(raw); if (any) { any.ok = false; any.reason = any.value + ' — ' + NameplateParser.catalogue(any.value).why + '. Check against the plate.'; E.model = any; } }
+      }
+      if (sl != null && !qr.serial) {
+        var sr = await multiRead(wk.w, lineJobs(sl), '7', '', job, NameplateParser.serialIn); if (!sr.early) sr = sr.concat(await multiRead(wk.w, lineJobs(sl).slice(0, 3), '7', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.', job));
+        E.serial = tallyField(sr.map(function (r) { return NameplateParser.serialIn(r.text); }));
+        if (E.serial && !NameplateParser.serialKnown(E.serial.value)) { E.serial.ok = false; E.serial.reason += ' Letters ' + E.serial.value.slice(0, 3) + ' have not been seen on a Vogelsang serial before (known: ' + NameplateParser.SERIAL_LETTERS.join(', ') + ', or 11 digits) — check against the plate.'; }
+      }
+      if (pnl != null) {
+        var pr = await multiRead(wk.w, lineJobs(pnl), '7', '', job, NameplateParser.partIn); if (!pr.early) pr = pr.concat(await multiRead(wk.w, lineJobs(pnl).slice(0, 3), '7', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', job));
+        E.partNo = tallyField(pr.map(function (r) { return NameplateParser.partIn(r.text); }));
+        if (E.partNo && !NameplateParser.partPrefixKnown(E.partNo.value)) { E.partNo.ok = false; E.partNo.reason += ' Prefix ' + E.partNo.value.slice(0, 3) + ' has not been seen on a Vogelsang part number before (known: ' + NameplateParser.PART_PREFIXES.join(', ') + ') — check the first letters against the plate.'; }
+      }
+      var yj = [];
+      [0.3, 0.42].forEach(function (cx) { [0.8, 0.5].forEach(function (k) { VY.forEach(function (v) { yj.push(cropScale(v, Math.round(zy.width * cx), Math.round(zy.height * 0.2), Math.round(zy.width * (1 - cx)), Math.round(zy.height * 0.8), k)); }); }); });
+      var yOf = function (t) { var ys = NameplateParser.yearsIn(t, MAX_YEAR); return ys.length === 1 ? ys[0] : null; };
+      // tight crops around the year row (block mode) — these read the camera picture best
+      var yj6 = [];
+      [[0.5, 0.3, 0.4], [0.42, 0.3, 0.4], [0.3, 0.25, 0.5]].forEach(function (c) { [1, 0.6, 1.5].forEach(function (k) { [zy, zy150].forEach(function (v) { yj6.push(cropScale(v, Math.round(zy.width * c[0]), Math.round(zy.height * c[1]), Math.round(zy.width * (1 - c[0])), Math.round(zy.height * c[2]), k)); }); }); });
+      var yr = await multiRead(wk.w, yj6, '6', '0123456789', job, yOf);
+      if (!yr.early) yr = yr.concat(await multiRead(wk.w, yj, '11', '0123456789', job, yOf));
+      window.__yr = yr.map(function (r) { return r.text.replace(/\n/g, ' / '); });
+      var yv = []; yr.forEach(function (r) { var ys = NameplateParser.yearsIn(r.text, MAX_YEAR); if (ys.length === 1) yv.push(ys[0]); else yv.push(null); });
+      E.year = tallyField(yv);
+      if (job.cancelled) return;
+      await wk.w.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '6' });
+      ['model', 'serial', 'partNo', 'year'].forEach(function (k) {
+        var e = E[k], f = parsed[k];
+        if (!e) { if (f.value && f.status === 'ok') { f.status = 'check'; f.reason += ' Could not confirm with repeated reads — check.'; } return; }
+        parsed[k] = { value: e.value, conf: f.conf, status: e.ok ? 'ok' : 'check', line: f.line, reason: e.reason, alternatives: e.alternatives };
+      });
+      if (qr.serial) {   // cross-check: the QR is error-checked, so it decides; the printed serial is compared and logged
+        var txt = parsed.serial && parsed.serial.value || '';
+        parsed.serial = { value: qr.serial, conf: 100, status: 'ok', line: parsed.serial && parsed.serial.line, qr: true, ocr: txt, match: txt ? txt === qr.serial : null,
+          reason: 'Read from the QR code (error-checked).' + (txt ? (txt === qr.serial ? ' The printed serial matches.' : ' The printed serial was read as ' + txt + ' — the QR value is used.') : ''), alternatives: [] };
+      }
+      window.__ens = { model: E.model, serial: E.serial, partNo: E.partNo, year: E.year, yv: yv, ml: ml, sl: sl, bands: bt.length, mr: typeof mr !== 'undefined' ? mr.map(function (r) { return r.text.trim(); }) : null, sr: typeof sr !== 'undefined' ? sr.map(function (r) { return r.text.trim(); }) : null };
+      T.recognize = performance.now() - tr;
+      T.total = performance.now() - t0;
+      P('Done — review the values below.', 1);
+      var allLines = lt1.map(function (l, i) { return { text: l.text + (lt2[i] && lt2[i].text !== l.text ? '   ‖ ' + lt2[i].text : ''), confidence: l.confidence, words: [] }; })
+        .concat([{ text: '— year box —', confidence: 100, words: [] }])
+        .concat(ly1.map(function (l, i) { return { text: l.text + (ly2[i] && ly2[i].text !== l.text ? '   ‖ ' + ly2[i].text : ''), confidence: l.confidence, words: [] }; }));
+      last = {
+        tool: 'assetpulse-ocr-bench', build: BUILD, parser: NameplateParser.version, at: new Date().toISOString(), mode: 'vogelsang-template',
+        device: { ua: navigator.userAgent, cores: navigator.hardwareConcurrency || null, memoryGB: navigator.deviceMemory || null, simd: simdOK(), engine: wk.variant, firstReadThisSession: !!wk.fresh },
+        photo: photoInfo, settings: opt, rotation: rot, corners: orderQuad(quad).map(function (p) { return { x: Math.round(p.x), y: Math.round(p.y) }; }),
+        qr: qr,
+        ocrImage: { skewText: zt._skew, skewYear: zy._skew, w: PW, h: PH, textZone: zt.width + 'x' + zt.height, yearZone: zy.width + 'x' + zy.height, inverted: zt._inv, textLines: bt.length, yearLines: by.length },
+        timingsMs: Object.keys(T).reduce(function (o, k) { o[k] = Math.round(T[k]); return o; }, {}),
+        meanConfidence: Math.round(lt1.concat(ly1).reduce(function (a, l) { return a + l.confidence; }, 0) / Math.max(1, lt1.length + ly1.length)),
+        rawText: allLines.map(function (l) { return l.text; }).join('\n'),
+        lines: allLines.map(function (l) { return { text: norm(l.text), conf: Math.round(l.confidence) }; }),
+        proposed: { model: parsed.model, serial: parsed.serial, partNo: parsed.partNo || { value: '', conf: null, status: 'none', reason: 'Not read in this mode.', alternatives: [] }, year: parsed.year },
+        notes: parsed.notes,
+        verdict: { model: null, serial: null, partNo: null, year: null }, final: null
+      };
+      runs.push(last); $('nRuns').textContent = runs.length; persistRuns();
+      if (o.silent) { var outP = parsed; setTimeout(function () {}, 0); return outP; }
+      renderReview(parsed);
+      var dbg = document.createElement('canvas'); dbg.width = PW; dbg.height = PH; var dg = dbg.getContext('2d'); dg.drawImage(plate, 0, 0);
+      dg.drawImage(zt, zt._ox, zt._oy); dg.drawImage(zy, zy._ox, zy._oy);
+      dg.lineWidth = 3;
+      [[zt, bt, lt1], [zy, by, ly1]].forEach(function (z) { dg.strokeStyle = '#38bdf8'; dg.strokeRect(z[0]._ox, z[0]._oy, z[0].width, z[0].height);
+        z[1].forEach(function (b, i) { var cf = z[2][i] ? z[2][i].confidence : 0; dg.strokeStyle = cf >= 80 ? '#16a34a' : cf >= 60 ? '#d97706' : '#dc2626'; dg.strokeRect(z[0]._ox + b.x0, z[0]._oy + b.y0, b.x1 - b.x0, b.y1 - b.y0); }); });
+      renderDebug(dbg, [], null, last);
+      $('raw').textContent = allLines.map(function (l, i) { return String(i + 1).padStart(2, ' ') + '  ' + l.text + '   [' + Math.round(l.confidence) + '%]'; }).join('\n');
+      window.__zones = { text: zt.toDataURL('image/png'), year: zy.toDataURL('image/png') };
+    } catch (e) {
+      console.error(e); prog('', 0);
+      showErr('OCR failed: ' + (e && e.message ? e.message : String(e)) + '\nYou can still type the values manually.');
+      await releaseWorker();
+    } finally { if (curJob === job) curJob = null; if (!o.silent) setBusy(false); }
+  }
+  function setMode(m) {
+    mode = m; $('mVg').className = m === 'vg' ? 'on' : ''; $('mFree').className = m === 'free' ? 'on' : '';
+    $('tipVg').classList.toggle('hide', m !== 'vg'); $('tipFree').classList.toggle('hide', m === 'vg');
+    crop = null; if (rotCache) drawCrop();
+  }
+
+  function preprocess(opt) {
+    var r = rotCache, c0 = crop || { x: 0, y: 0, w: r.width, h: r.height };
+    var long = Math.max(c0.w, c0.h);
+    var s = opt.max / long;                // up- or down-scale so text is a useful size
+    s = Math.min(s, 3);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(c0.w * s)); c.height = Math.max(1, Math.round(c0.h * s));
+    var g = c.getContext('2d', { willReadFrequently: true });
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(r, c0.x, c0.y, c0.w, c0.h, 0, 0, c.width, c.height);
+    var im = g.getImageData(0, 0, c.width, c.height), d = im.data, n = d.length / 4, hist = new Uint32Array(256);
+    for (var i = 0; i < d.length; i += 4) { var v = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; if (opt.invert) v = 255 - v; d[i] = v; hist[v]++; }
+    var lo = 0, hi = 255;
+    if (opt.contrast) {
+      var acc = 0; for (lo = 0; lo < 255; lo++) { acc += hist[lo]; if (acc > n * 0.02) break; }
+      acc = 0; for (hi = 255; hi > 0; hi--) { acc += hist[hi]; if (acc > n * 0.02) break; }
+      if (hi - lo < 20) { lo = 0; hi = 255; }
+    }
+    var thr = -1;
+    if (opt.bin) { // Otsu
+      var sum = 0; for (var t = 0; t < 256; t++) sum += t * hist[t];
+      var sB = 0, wB = 0, best = 0;
+      for (t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; var wF = n - wB; if (!wF) break; sB += t * hist[t]; var mB = sB / wB, mF = (sum - sB) / wF, between = wB * wF * (mB - mF) * (mB - mF); if (between > best) { best = between; thr = t; } }
+    }
+    for (i = 0; i < d.length; i += 4) {
+      var g0 = d[i], out = g0;
+      if (thr >= 0) out = g0 > thr ? 255 : 0;
+      else if (opt.contrast) out = Math.max(0, Math.min(255, (g0 - lo) * 255 / (hi - lo)));
+      d[i] = d[i + 1] = d[i + 2] = out; d[i + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    return { canvas: c, crop: c0, scale: s };
+  }
+
+  // ---------- run ----------
+  var running = false, last = null, runs = [];
+  function prog(msg, p) { if (PHOTO_EMBED && photoJob && msg) photoJob.send({ kind: 'progress', msg: msg }); if (np.busy && msg) $('npHead').textContent = msg; $('status').textContent = msg; $('prog').style.width = Math.round(Math.max(0, Math.min(1, p)) * 100) + '%'; }
+  function showErr(m) {
+    $('err').textContent = m; var e1 = $('err1'); e1.textContent = m; e1.classList.toggle('hide', !m);
+    if (m) try { e1.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (x) {}
+  }
+  function clearErr() { $('err').textContent = ''; $('err1').textContent = ''; $('err1').classList.add('hide'); }
+  function setBusy(b) { running = b; ['bRead', 'bRot', 'bReset', 'bCam', 'bLib'].forEach(function (k) { $(k).disabled = b; }); $('rowCancel').classList.toggle('hide', !b); }
+
+  async function read() {
+    if (!rotCache || running) return;
+    clearErr(); setBusy(true);
+    var opt = { psm: $('sPsm').value, contrast: $('sContrast').checked, invert: $('sInvert').checked, bin: $('sBin').checked, max: +$('sMax').value, engine: $('sEng').value };
+    var T = {}, t0 = performance.now(), job = {}; curJob = job;
+    var P = function (m, v) { if (!job.cancelled) prog(m, v); }; progSink = P;
+    try {
+      var tp = performance.now();
+      var pre = preprocess(opt); T.preprocess = performance.now() - tp;
+      var wk = await getWorker(opt.engine, P);
+      if (job.cancelled) return;
+      if (wk.fresh) { T.unpackAssets = wk.tUnpack; T.startEngine = wk.tInit; }
+      await wk.w.setParameters({ tessedit_pageseg_mode: opt.psm, preserve_interword_spaces: '1' });
+      P('Reading nameplate…', 0.35);
+      var tr = performance.now();
+      var res = await wk.w.recognize(pre.canvas, {}, { text: true, blocks: true });
+      if (job.cancelled) return;
+      T.recognize = performance.now() - tr;
+      var tx = performance.now();
+      var lines = [];
+      (res.data.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { lines.push({ text: l.text, confidence: l.confidence, words: (l.words || []).map(function (w) { return { text: w.text, confidence: w.confidence, bbox: w.bbox }; }) }); }); }); });
+      var parsed = NameplateParser.parse(lines, { maxYear: MAX_YEAR });
+      T.extract = performance.now() - tx;
+      T.total = performance.now() - t0;
+      prog('Done — review the values below.', 1);
+      last = {
+        tool: 'assetpulse-ocr-bench', build: BUILD, parser: NameplateParser.version, at: new Date().toISOString(),
+        device: { ua: navigator.userAgent, cores: navigator.hardwareConcurrency || null, memoryGB: navigator.deviceMemory || null, simd: simdOK(), engine: wk.variant, firstReadThisSession: !!wk.fresh },
+        photo: photoInfo, settings: opt, rotation: rot, crop: pre.crop && { x: Math.round(pre.crop.x), y: Math.round(pre.crop.y), w: Math.round(pre.crop.w), h: Math.round(pre.crop.h) },
+        ocrImage: { w: pre.canvas.width, h: pre.canvas.height },
+        timingsMs: Object.keys(T).reduce(function (o, k) { o[k] = Math.round(T[k]); return o; }, {}),
+        meanConfidence: Math.round(res.data.confidence),
+        rawText: res.data.text,
+        lines: lines.map(function (l) { return { text: l.text.trim(), conf: Math.round(l.confidence) }; }),
+        proposed: { model: parsed.model, serial: parsed.serial, partNo: parsed.partNo || { value: '', conf: null, status: 'none', reason: 'Not read in this mode.', alternatives: [] }, year: parsed.year },
+        codes: parsed.codes,
+        notes: parsed.notes,
+        verdict: { model: null, serial: null, partNo: null, year: null }, final: null
+      };
+      runs.push(last); $('nRuns').textContent = runs.length;
+      renderReview(parsed); renderDebug(pre.canvas, lines, res.data, last);
+    } catch (e) {
+      console.error(e);
+      prog('', 0);
+      showErr('OCR failed: ' + (e && e.message ? e.message : String(e)) + '\nYou can still type the values manually.');
+      await releaseWorker();
+    } finally { if (curJob === job) curJob = null; setBusy(false); }
+  }
+
+  // ---------- review UI (all OCR text goes in via textContent / value) ----------
+  var NAMES = { model: 'Pump model / type', serial: 'Serial number', partNo: 'Part number', year: 'Year of manufacture' };
+  var STAT = { ok: ['b-ok', 'Looks clear'], check: ['b-check', 'Check'], none: ['b-none', 'Not found'] };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function renderReview(p) {
+    var box = $('fields'); box.textContent = '';
+    ['model', 'serial', 'partNo', 'year'].forEach(function (k) {
+      var f = p[k] || { value: '', conf: null, status: 'none', reason: 'Not read in this mode — enter it manually.', alternatives: [] }, wrap = el('div', 'field'), head = el('div', 'fhead');
+      head.appendChild(el('span', 'fname', NAMES[k]));
+      head.appendChild(el('span', 'badge ' + STAT[f.status][0], STAT[f.status][1]));
+      wrap.appendChild(head);
+      var inp;
+      if (k === 'year') {
+        inp = el('select'); inp.appendChild(new Option('— leave blank —', ''));
+        YEARS.forEach(function (y) { inp.appendChild(new Option(y, y)); });
+        var inList = !f.value || YEARS.indexOf(f.value) >= 0;
+        inp.value = inList ? f.value : '';
+        if (!inList) f.reason += ' Year ' + f.value + ' is outside the app’s list (1990–' + MAX_YEAR + '), so it is left blank.';
+      } else { inp = el('input'); inp.type = 'text'; inp.value = f.value; inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('autocapitalize', 'characters'); }
+      inp.id = 'rv_' + k; wrap.appendChild(inp); wrap.classList.add('f-' + f.status);
+      wrap.appendChild(el('div', 'reason', f.reason));
+      if (f.alternatives.length) {
+        var al = el('div', 'alts'); al.appendChild(el('span', 'reason', 'Other candidates:'));
+        f.alternatives.forEach(function (a) { var b = el('button', null, a.value); b.type = 'button'; b.onclick = function () { inp.value = a.value; }; al.appendChild(b); });
+        wrap.appendChild(al);
+      }
+      var vd = el('div', 'verdict'); vd.appendChild(el('span', null, 'Correct vs plate?'));
+      var by = el('button', null, '✓'), bn = el('button', null, '✗');
+      by.type = bn.type = 'button';
+      by.onclick = function () { last.verdict[k] = true; by.className = 'on-y'; bn.className = ''; };
+      bn.onclick = function () { last.verdict[k] = false; bn.className = 'on-n'; by.className = ''; };
+      vd.appendChild(by); vd.appendChild(bn); wrap.appendChild(vd);
+      box.appendChild(wrap);
+    });
+    $('cReview').classList.remove('hide');
+    $('cReview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function fillForm(acc) {
+    var map = { model: 'fmModel', serial: 'fmSerial', partNo: 'fmPart', year: 'fmYear' };
+    Object.keys(map).forEach(function (k) {
+      var el2 = $(map[k]), v = acc[k] || '';
+      if (k === 'year' && v && YEARS.indexOf(v) < 0) v = '';
+      el2.value = v; el2.classList.toggle('filled', !!v);
+      if (el2.tagName === 'INPUT') el2.placeholder = v ? '' : 'Could not be read — please type';
+    });
+    try { $('cForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+  }
+  function clearForm() { ['fmBrand', 'fmModel', 'fmSerial', 'fmPart', 'fmYear'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('filled'); $(id).classList.remove('unsure'); if ($(id).tagName === 'INPUT') $(id).placeholder = ''; }); }
+  function useValues() {
+    if (!last) return;
+    var map = { model: 'fmModel', serial: 'fmSerial', year: 'fmYear' }, done = [], kept = [];
+    last.final = {};
+    ['model', 'serial', 'partNo', 'year'].forEach(function (k) {
+      var v = String($('rv_' + k).value || '').trim();
+      last.final[k] = v;
+      if (!map[k]) return;
+      var target = $(map[k]), cur = String(target.value || '').trim();
+      if (!v) return;
+      if (!cur) { target.value = v; done.push(NAMES[k]); return; }
+      if (cur === v) return;
+      if (confirm(NAMES[k] + ' already has “' + cur + '”.\nReplace it with “' + v + '”?')) { target.value = v; done.push(NAMES[k]); }
+      else kept.push(NAMES[k]);
+    });
+    toast('Confirmed: ' + ['model', 'serial', 'partNo', 'year'].map(function (k) { return NAMES[k] + ' ' + (last.final[k] || '—'); }).join(' · '));
+  }
+
+  function renderDebug(cv, lines, data, rec) {
+    var o = $('outCv'); o.width = cv.width; o.height = cv.height;
+    var g = o.getContext('2d'); g.drawImage(cv, 0, 0);
+    g.lineWidth = Math.max(2, cv.width / 500);
+    lines.forEach(function (l) { l.words.forEach(function (w) {
+      if (!w.bbox) return;
+      g.strokeStyle = w.confidence >= 80 ? '#16a34a' : w.confidence >= 60 ? '#d97706' : '#dc2626';
+      g.strokeRect(w.bbox.x0, w.bbox.y0, w.bbox.x1 - w.bbox.x0, w.bbox.y1 - w.bbox.y0);
+    }); });
+    $('raw').textContent = lines.map(function (l, i) { return String(i + 1).padStart(2, ' ') + '  ' + l.text.replace(/\n$/, '') + '   [' + Math.round(l.confidence) + '%]'; }).join('\n') || '(no text found)';
+    var nt = [];
+    if (rec.notes.ignored.length) nt.push('Ignored labels: ' + rec.notes.ignored.join('; '));
+    if (rec.notes.yearLikeNumbers.length) nt.push('Year-like numbers seen (never used without a label): ' + rec.notes.yearLikeNumbers.join(', '));
+    $('notes').textContent = nt.join(' · ');
+    var t = $('tim'); t.textContent = '';
+    var rows = [['Engine', rec.device.engine === 'simd' ? 'Fast (SIMD)' : 'Compatible'], ['First read this session', rec.device.firstReadThisSession ? 'yes' : 'no']];
+    var lab = { unpackAssets: 'Unpack engine files', startEngine: 'Start engine', preprocess: 'Prepare image', recognize: 'Recognise text', extract: 'Find model/serial/year', total: 'Total' };
+    Object.keys(rec.timingsMs).forEach(function (k) { rows.push([lab[k] || k, (rec.timingsMs[k] / 1000).toFixed(2) + ' s']); });
+    rows.push(['Photo', rec.photo.origW + '×' + rec.photo.origH + ' px, ' + Math.round((rec.photo.bytes || 0) / 1024) + ' KB']);
+    rows.push(['Image given to OCR', rec.ocrImage.w + '×' + rec.ocrImage.h + ' px']);
+    rows.push(['Mean OCR confidence', rec.meanConfidence + '%']);
+    rows.push(['CPU cores / memory', (rec.device.cores || '?') + ' / ' + (rec.device.memoryGB ? rec.device.memoryGB + ' GB' : 'n/a')]);
+    rows.forEach(function (r) { var tr = el('tr'); tr.appendChild(el('td', null, r[0])); tr.appendChild(el('td', null, r[1])); t.appendChild(tr); });
+    $('cDebug').classList.remove('hide');
+  }
+
+  // ---------- results export ----------
+  function snapshot(r) {
+    if (r === last && last && document.getElementById('rv_model')) {
+      r.edited = { model: $('rv_model').value, serial: $('rv_serial').value, partNo: $('rv_partNo').value, year: $('rv_year').value };
+    }
+    return r;
+  }
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(function () { toast('Copied'); }, function () { fallbackCopy(text); });
+    fallbackCopy(text);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    toast(ok ? 'Copied' : 'Copy blocked — use Download .json');
+  }
+  function toast(m) { var t = el('div', 'toast', m); document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200); }
+
+  // ---------- Live scanner (tap 1: Scan plate, tap 2: Capture) ----------
+  var scan = { stream: null, track: null, torch: false };
+  var GUIDE = [ // plate fractions (from the 15 real VX / XRC / XRG plates)
+    { k: 'logo', x: 0.08, y: 0.07, w: 0.44, h: 0.14, t: 'VOGELSANG logo' },
+    { k: 'qr', x: 0.56, y: 0.07, w: 0.33, h: 0.38, t: 'QR' },
+    { k: 'model', x: 0.03, y: 0.33, w: 0.50, h: 0.10, t: 'Model' },
+    { k: 'serial', x: 0.03, y: 0.43, w: 0.50, h: 0.10, t: 'Serial no.' },
+    { k: 'part', x: 0.03, y: 0.55, w: 0.50, h: 0.11, t: 'Part no.' },
+    { k: 'year', x: 0.60, y: 0.45, w: 0.34, h: 0.10, t: 'Year' }
+  ];
+  function frameRect() { // plate outline in screen pixels (measured on the video element itself: iPhone toolbars change window size)
+    var vr = $('scanVid').getBoundingClientRect(), vw = vr.width || window.innerWidth, vh = vr.height || window.innerHeight, fw = Math.min(vw * 0.94, vh * 0.62 * 1.2), fh = fw / 1.2;
+    return { x: (vw - fw) / 2, y: Math.max(60, (vh - fh) / 2 - 50), w: fw, h: fh, vw: vw, vh: vh };
+  }
+  function drawGuide() {
+    var cv = $('scanCv'), d = window.devicePixelRatio || 1, f = frameRect();
+    cv.width = f.vw * d; cv.height = f.vh * d; var g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0);
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, f.vw, f.vh); g.clearRect(f.x, f.y, f.w, f.h);
+    var col = auto.state === 'ok' ? '#22c55e' : '#f59e0b';
+    g.strokeStyle = col; g.lineWidth = auto.state === 'ok' ? 6 : 3; g.strokeRect(f.x, f.y, f.w, f.h);
+    if (auto.state === 'ok') { g.fillStyle = 'rgba(34,197,94,.12)'; g.fillRect(f.x, f.y, f.w, f.h); }
+    g.font = '600 ' + Math.max(11, f.w / 30) + 'px sans-serif';
+    GUIDE.forEach(function (b) {
+      var x = f.x + b.x * f.w, y = f.y + b.y * f.h, w = b.w * f.w, h = b.h * f.h, main = /model|serial|part|year/.test(b.k);
+      g.setLineDash(main ? [] : [6, 5]); g.strokeStyle = main ? 'rgba(56,189,248,.95)' : 'rgba(255,255,255,.55)'; g.lineWidth = main ? 2 : 1.5; g.strokeRect(x, y, w, h);
+      g.setLineDash([]); g.fillStyle = main ? 'rgba(56,189,248,.9)' : 'rgba(255,255,255,.75)';
+      if (main) { g.save(); g.font = '600 ' + Math.max(9, f.w / 42) + 'px sans-serif'; g.textAlign = 'right'; g.fillText(b.t, x + w - 4, y + h - 4); g.restore(); }
+      else g.fillText(b.t, x + 4, y + 14);
+    });
+  }
+  // ---------- Auto-capture: watch the live picture; when the plate sits in the outline, sharp and steady -> green -> read ----------
+  var auto = { timer: null, okRun: 0, prev: null, state: 'search', cv: null, last: null };
+  function analyzeFrame() {
+    var v = $('scanVid'); if (!v.videoWidth) return null;
+    var r = frameInVideo(v), ex = 0.08, W = 160, H = Math.round(W / 1.2 * (1 + 2 * ex) / (1 + 2 * ex));
+    W = Math.round(160 * (1 + 2 * ex)); H = Math.round(160 / 1.2 * (1 + 2 * ex));
+    if (!auto.cv) auto.cv = document.createElement('canvas');
+    var c = auto.cv; c.width = W; c.height = H; var g = c.getContext('2d', { willReadFrequently: true });
+    g.fillStyle = '#808080'; g.fillRect(0, 0, W, H);
+    g.drawImage(v, r.x - r.w * ex, r.y - r.h * ex, r.w * (1 + 2 * ex), r.h * (1 + 2 * ex), 0, 0, W, H);
+    var d = g.getImageData(0, 0, W, H).data, grey = new Uint8Array(W * H), dark = new Uint8Array(W * H);
+    for (var i = 0; i < W * H; i++) { var R = d[i * 4], G = d[i * 4 + 1], B = d[i * 4 + 2], mx = Math.max(R, G, B), mn = Math.min(R, G, B); grey[i] = (R * 3 + G * 6 + B) / 10; dark[i] = mx < 95 && (mx - mn) < 0.5 * mx + 12 ? 1 : 0; }
+    var px = function (u) { return Math.round((ex + u) / (1 + 2 * ex) * W); }, py = function (t) { return Math.round((ex + t) / (1 + 2 * ex) * H); };
+    var frac = function (u0, v0, u1, v1, fn) { var x0 = Math.max(0, px(u0)), x1 = Math.min(W, px(u1)), y0 = Math.max(0, py(v0)), y1 = Math.min(H, py(v1)), n = 0, k = 0; for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) { n++; k += fn(y * W + x); } return n ? k / n : 0; };
+    var isDark = function (j) { return dark[j]; }, isBright = function (j) { return grey[j] > 140 ? 1 : 0; };
+    var fill = frac(0.05, 0.05, 0.95, 0.95, isDark);
+    // where are the plate's edges? rows / columns that are mostly dark plate
+    var rowD = [], colD = [];
+    for (var y = 0; y < H; y++) { var c1 = 0; for (var x = 0; x < W; x++) c1 += dark[y * W + x]; rowD.push(c1 / W); }
+    for (x = 0; x < W; x++) { var c2 = 0; for (y = 0; y < H; y++) c2 += dark[y * W + x]; colD.push(c2 / H); }
+    var firstLast = function (a, t) { var f = -1, l = -1; for (var k = 0; k < a.length; k++) if (a[k] > t) { if (f < 0) f = k; l = k; } return [f, l]; };
+    var ry = firstLast(rowD, 0.22), rx = firstLast(colD, 0.22);   // glare can lighten part of the plate
+    var toU = function (p, n) { return p / n * (1 + 2 * ex) - ex; };   // pixel -> outline fraction (0 = outline edge, 1 = other edge)
+    var L = toU(rx[0], W), R = toU(rx[1] + 1, W), T = toU(ry[0], H), B = toU(ry[1] + 1, H);
+    var txt = frac(0.04, 0.30, 0.50, 0.66, isBright);
+    // template fingerprint: QR square is half bright, the band above the address is empty, the address line has text
+    var qr = frac(0.60, 0.12, 0.85, 0.40, isBright), gapBand = frac(0.06, 0.73, 0.50, 0.83, isBright), addr = frac(0.20, 0.86, 0.80, 0.97, isBright);
+    var gsum = 0, gn = 0; for (y = py(0.30); y < py(0.66); y++) for (x = px(0.04); x < px(0.50); x++) { gsum += Math.abs(grey[y * W + x + 1] - grey[y * W + x]); gn++; }
+    var sharp = gn ? gsum / gn : 0, still = 99;
+    // steadiness on a coarse 8x8-block picture: small hand tremor is fine, a moving phone is not
+    var bw = Math.floor(W / 8), bh = Math.floor(H / 8), coarse = new Float32Array(bw * bh);
+    for (var by = 0; by < bh; by++) for (var bx = 0; bx < bw; bx++) { var acc = 0; for (var yy = 0; yy < 8; yy++) for (var xx = 0; xx < 8; xx++) acc += grey[(by * 8 + yy) * W + bx * 8 + xx]; coarse[by * bw + bx] = acc / 64; }
+    if (auto.prev && auto.prev.length === coarse.length) { var dd = 0; for (i = 0; i < coarse.length; i++) dd += Math.abs(coarse[i] - auto.prev[i]); still = dd / coarse.length; }
+    auto.prev = coarse;
+    var TOL = 0.09, wid = R - L, hei = B - T;
+    var m = { qr: +qr.toFixed(2), gap: +gapBand.toFixed(2), addr: +addr.toFixed(2), fill: +fill.toFixed(2), L: +L.toFixed(2), R: +R.toFixed(2), T: +T.toFixed(2), B: +B.toFixed(2), txt: +txt.toFixed(2), sharp: +sharp.toFixed(1), still: +still.toFixed(1) }, hint = '';
+    if (rx[0] < 0 || ry[0] < 0 || fill < 0.4) hint = 'Point the camera at the black nameplate';
+    else if (wid < 1 - 2 * TOL || hei < 1 - 2 * TOL) hint = 'Move closer — the plate should fill the outline';
+    else if (wid > 1 + 2 * TOL || hei > 1 + 2 * TOL) hint = 'Move back a little';
+    else if (L > TOL) hint = 'Move the phone a little to the right';
+    else if (R < 1 - TOL) hint = 'Move the phone a little to the left';
+    else if (T > TOL) hint = 'Move the phone a little down';
+    else if (B < 1 - TOL) hint = 'Move the phone a little up';
+    else if (L < -TOL || R > 1 + TOL || T < -TOL || B > 1 + TOL) hint = 'Centre the plate in the outline';
+    else if (txt < 0.02 || txt > 0.45 || ((qr >= 0.12 && qr <= 0.9) + (gapBand <= 0.12) + (addr >= 0.01)) < 2) hint = 'Line the plate up with the outline — QR top right, text in the blue boxes';
+    else if (sharp < 4) hint = 'Hold steady — focusing…';
+    else if (still > 12) hint = 'Hold steady…';
+    m.hint = hint; m.ok = !hint; auto.last = m; return m;
+  }
+  // Green ONLY when every value has been read identically, with full confidence, in 2 separate camera frames.
+  var FIELDS = ['model', 'serial', 'partNo', 'year'], SCAN_LIMIT_MS = 30000;
+  var sess = null;
+  function newSession() { sess = { votes: { model: {}, serial: {}, partNo: {}, year: {} }, accepted: {}, frames: 0, t0: 0, busy: false, qr: null, qrMatch: null }; setQrTag(null); }
+  function setQrTag(m) { var t = $('fmSerialQr'); if (t) t.textContent = m == null ? '' : m === true ? '✓ matches QR' : m === false ? '✓ from QR (print read differently)' : '✓ from QR'; }
+  function mergeFrame(res) {
+    sess.frames++;
+    var rs = res && res.serial;
+    if (rs && rs.qr && rs.value) {
+      sess.qr = rs.value; sess.accepted.serial = rs.value;
+      if (rs.match === true) sess.qrMatch = true; else if (rs.match === false && sess.qrMatch !== true) sess.qrMatch = false;
+    }
+    FIELDS.forEach(function (k) {
+      if (k === 'serial' && sess.qr) return;
+      var f = res && res[k]; if (!f || f.status !== 'ok' || !f.value) return;
+      var v = sess.votes[k]; v[f.value] = (v[f.value] || 0) + 1;
+      var keys = Object.keys(v).sort(function (a, b) { return v[b] - v[a]; }), top = keys[0], second = keys[1] ? v[keys[1]] : 0;
+      if (v[top] >= 2 && v[top] >= second + 2) sess.accepted[k] = top;   // two frames agree, nothing contradicts
+    });
+    return FIELDS.every(function (k) { return sess.accepted[k]; });
+  }
+  function finishScan(complete) {
+    if (sess) sess.done = true;
+    stopAuto();
+    var acc = sess.accepted, qrm = sess.qr ? (sess.qrMatch === null ? 'qr' : sess.qrMatch) : null;
+    auto.state = complete ? 'ok' : 'search'; drawGuide();
+    $('scanTip').textContent = complete ? '✓ All values read' : 'Done — please type the empty box(es)';
+    crumb('scan finished: ' + JSON.stringify(acc) + ' frames ' + sess.frames);
+    setTimeout(function () {
+      embedPost({ values: acc, complete: complete, qr: qrm }); closeScanner(); if (EMBED) { fillForm(acc); setQrTag(qrm); } else applyScan(acc, qrm, false);
+      window.__final = { values: acc, complete: complete, frames: sess.frames, ms: Date.now() - sess.t0, qr: qrm };
+    }, complete ? 700 : 1200);
+  }
+  function autoTick() {
+    if ($('scanner').classList.contains('hide') || !scan.stream || !sess) return;
+    if (!sess.open) sess.open = Date.now();
+    if (sess.t0 && Date.now() - sess.t0 > SCAN_LIMIT_MS) { finishScan(FIELDS.every(function (k) { return sess.accepted[k]; })); return; }
+    if ((sess.inflight || 0) >= POOL || running) return;
+    var m = analyzeFrame(); if (!m) return;
+    // could not lock on cleanly (glare, dirt): keep reading what is in the outline — green still needs 2 agreeing frames
+    var lockWait = sess.frames ? 3000 : 10000;
+    if (!m.ok && m.fill >= 0.4 && Date.now() - (sess.lastRead || sess.open) > lockWait) { m.ok = true; m.hint = ''; auto.okRun = Math.max(auto.okRun, 2); }
+    auto.okRun = m.ok ? auto.okRun + 1 : 0;
+    var got = FIELDS.filter(function (k) { return sess.accepted[k]; }).length;
+    $('scanTip').textContent = !m.ok ? m.hint : (sess.frames ? 'Reading… hold still (' + got + ' of 4 confirmed)' : (auto.okRun >= 3 ? 'Reading… hold still' : 'Hold it there…'));
+    if (auto.okRun >= 3) {
+      if (!sess.t0) sess.t0 = Date.now();
+      if (!capture(true)) return;
+      var useExtra = POOL > 1 && (sess.inflight || 0) >= 1;
+      sess.inflight = (sess.inflight || 0) + 1; auto.okRun = useExtra ? 0 : 2;   // second frame follows a moment later
+      var mySess = sess;
+      readVG({ silent: true, extra: useExtra, full: sess.frames >= 2, qrKnown: sess.qr, frameNo: (sess.started = (sess.started || 0) + 1) - 1 }).then(function (res) {
+        mySess.inflight--; mySess.lastRead = Date.now();
+        if (sess !== mySess) return;
+        if (mySess.done) { mergeFrame(res || {}); if (!EMBED) applyScan(mySess.accepted, mySess.qr ? (mySess.qrMatch === null ? 'qr' : mySess.qrMatch) : null, true); return; }
+        if (mergeFrame(res || {})) { mySess.done = true; finishScan(true); }
+      }, function () { mySess.inflight--; });
+    }
+  }
+  function startAuto() { stopAuto(); newSession(); auto.okRun = 0; auto.prev = null; auto.state = 'search'; auto.timer = setInterval(autoTick, 250); }
+  function stopAuto() { if (auto.timer) clearInterval(auto.timer); auto.timer = null; auto.state = 'search'; }
+
+  // ---------- live preview painter ----------
+  var paint = { on: false, raf: 0, frames: 0 };
+  function paintFrame() {
+    if (!paint.on) return;
+    var v = $('scanVid'), cv = $('scanView');
+    if (v.videoWidth && v.readyState >= 2) {
+      var r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2), cw = Math.round(r.width * d), ch = Math.round(r.height * d);
+      if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+      var W = v.videoWidth, H = v.videoHeight, k = Math.max(cw / W, ch / H), sw = cw / k, sh = ch / k;   // same "cover" fit as frameInVideo()
+      try { cv.getContext('2d').drawImage(v, (W - sw) / 2, (H - sh) / 2, sw, sh, 0, 0, cw, ch); paint.frames++; } catch (e) {}
+    }
+    paint.raf = requestAnimationFrame(paintFrame);
+  }
+  function startPaint() { if (paint.on) return; paint.on = true; paint.frames = 0; paint.raf = requestAnimationFrame(paintFrame); }
+  function stopPaint() { paint.on = false; cancelAnimationFrame(paint.raf); var cv = $('scanView'); try { cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); } catch (e) {} }
+
+  var CAM_ERR = {
+    NotAllowedError: 'Camera permission was refused. Android: tap the icon left of the address › Permissions › Camera › Allow. iPhone: Settings › Safari › Camera › Allow. Then tap Scan plate again.',
+    SecurityError: 'The browser blocks the camera for this page (opened as a local file?). Open it from an https address, or use “Take photo”.',
+    NotFoundError: 'No camera was found. Use “Choose from library”.',
+    NotReadableError: 'The camera is busy in another app. Close the other app (camera, video call) and try again.',
+    OverconstrainedError: 'The camera does not support the requested mode. Try again — or use “Take photo”.',
+    AbortError: 'The camera stopped while starting. Try again.'
+  };
+  async function startStream(deviceId) {
+    var hi = $('sCamHi').checked ? { width: { ideal: 3840 }, height: { ideal: 3840 } } : { width: { ideal: 1920 }, height: { ideal: 1920 } };  // square ideal: no forced landscape crop in portrait
+    var v = deviceId ? Object.assign({ deviceId: { exact: deviceId } }, hi) : Object.assign({ facingMode: { ideal: 'environment' } }, hi);
+    try { return await navigator.mediaDevices.getUserMedia({ audio: false, video: v }); }
+    catch (e) { if (e && e.name === 'OverconstrainedError') return navigator.mediaDevices.getUserMedia({ audio: false, video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' } }); throw e; }
+  }
+  async function attachStream(stream) {
+    scan.stream = stream; var v = $('scanVid'); v.srcObject = stream;
+    try { await v.play(); } catch (e) {}
+    scan.track = stream.getVideoTracks()[0];
+    var caps = scan.track && scan.track.getCapabilities ? scan.track.getCapabilities() : {};
+    $('bTorch').classList.toggle('hide', !caps.torch); $('bTorch').style.background = 'rgba(0,0,0,.5)'; scan.torch = false;
+    try { if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) await scan.track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+    try { if (caps.pointsOfInterest || ('pointsOfInterest' in (scan.track.getSettings ? scan.track.getSettings() : {}))) await scan.track.applyConstraints({ advanced: [{ pointsOfInterest: [{ x: 0.5, y: 0.45 }] }] }); } catch (e) {}
+    scan.deviceId = scan.track && scan.track.getSettings ? scan.track.getSettings().deviceId : null;
+    // more than one back camera (wide / ultra-wide / tele): offer a switch
+    try {
+      var devs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'videoinput' && !/front|user|facetime/i.test(d.label); });
+      scan.backs = devs.map(function (d) { return d.deviceId; }).filter(Boolean);
+      $('bFlip').classList.toggle('hide', scan.backs.length < 2);
+    } catch (e) { $('bFlip').classList.add('hide'); }
+    $('bShot').disabled = false;
+    startAuto();
+  }
+  // Phone's own camera app (works even when the page is a local file); the photo is read automatically.
+  var autoRead = false;
+  function useNativeCamera(msg) { if (EMBED) { embedPost({ error: 'The camera could not open here. ' + (msg || 'Please type the values.') }); return; } crumb('scan: phone camera fallback'); autoRead = true; if (msg) showErr(msg); try { $('fCam').click(); } catch (e) { showErr('Please tap “Take photo” below.'); $('dFallback').open = true; } }
+  async function openScanner() {
+    clearErr();
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || window.isSecureContext === false) { useNativeCamera(''); return; }
+    $('scanner').classList.remove('hide'); document.body.style.overflow = 'hidden'; $('bShot').disabled = true; drawGuide();
+    if (!EMBED) { try { history.pushState({ scanner: 1 }, ''); scan.pushed = true; } catch (e) { scan.pushed = false; } }
+    crumb('scan: opening camera');
+    try { await attachStream(await startStream(scan.deviceId)); crumb('scan: camera running ' + ($('scanVid').videoWidth || '?') + 'x' + ($('scanVid').videoHeight || '?')); }
+    catch (e) {
+      crumb('scan: camera failed ' + (e && e.name)); closeScanner();
+      if (e && e.name === 'NotAllowedError' && !/^(file|content):/.test(location.protocol) && !scan.triedNative) { if (EMBED) { embedPost({ error: CAM_ERR.NotAllowedError }); return; } showErr(CAM_ERR.NotAllowedError); return; }
+      useNativeCamera('The live camera is blocked here (' + (e && e.name || 'error') + '), so the phone camera opened instead. Take the photo with the plate filling the picture.');
+      return;
+    }
+    window.addEventListener('resize', drawGuide); window.addEventListener('orientationchange', drawGuide);
+  }
+  function stopTracks() { stopAuto(); if (scan.stream) scan.stream.getTracks().forEach(function (t) { t.stop(); }); scan.stream = scan.track = null; scan.torch = false; $('scanVid').srcObject = null; }
+  function closeScanner(fromBack) {
+    crumb('scan: camera closed');
+    stopTracks(); $('scanner').classList.add('hide'); document.body.style.overflow = '';
+    window.removeEventListener('resize', drawGuide); window.removeEventListener('orientationchange', drawGuide);
+    if (scan.pushed && !fromBack) { scan.pushed = false; try { history.back(); } catch (e) {} } else scan.pushed = false;
+    if (EMBED) setTimeout(function () { embedPost({ cancelled: true }); }, 0);   // an error posted in the same moment wins
+  }
+  // Android back button closes the camera instead of leaving the page
+  window.addEventListener('popstate', function () { if (!$('scanner').classList.contains('hide')) closeScanner(true); });
+  // Phone locked / app switched: release the camera; restart it on return
+  document.addEventListener('visibilitychange', async function () {
+    if ($('scanner').classList.contains('hide')) return;
+    if (document.hidden) stopTracks();
+    else { try { $('bShot').disabled = true; await attachStream(await startStream(scan.deviceId)); } catch (e) { closeScanner(); showErr('Camera could not restart — tap Scan plate again.'); } }
+  });
+  function frameInVideo(v) { // screen outline -> video pixels (video is shown with object-fit: cover)
+    var f = frameRect(), W = v.videoWidth, H = v.videoHeight, k = Math.max(f.vw / W, f.vh / H), ox = (f.vw - W * k) / 2, oy = (f.vh - H * k) / 2;
+    return { x: (f.x - ox) / k, y: (f.y - oy) / k, w: f.w / k, h: f.h / k };
+  }
+  function capture(keepOpen) {
+    var v = $('scanVid'), W = v.videoWidth, H = v.videoHeight;
+    if (!W || !H || running) return false;
+    crumb('capture: ' + W + 'x' + H);
+    var r = frameInVideo(v), mx = r.w * 0.06, my = r.h * 0.06;
+    scan.lowRes = r.w < 700;
+    var x0 = Math.max(0, Math.round(r.x - mx)), y0 = Math.max(0, Math.round(r.y - my)), x1 = Math.min(W, Math.round(r.x + r.w + mx)), y1 = Math.min(H, Math.round(r.y + r.h + my));
+    var c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0;
+    c.getContext('2d').drawImage(v, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+    if (!keepOpen) closeScanner();
+    photoInfo = { name: 'live-scan', bytes: null, type: 'camera frame', origW: W, origH: H, workW: c.width, workH: c.height };
+    $('cReview').classList.add('hide'); $('cDebug').classList.add('hide');
+    src = c; rot = 0; crop = null; rotCache = null; setMode('vg');
+    var qx = r.x - x0, qy = r.y - y0;
+    quad = [{ x: qx, y: qy }, { x: qx + r.w, y: qy }, { x: qx + r.w, y: qy + r.h }, { x: qx, y: qy + r.h }];
+    rotCache = rotated(); rotCache._rot = rot; rotCache._src = src;
+    var det = detectPlate(0.97);
+    crumb('capture: plate corners ' + (det ? 'found' : 'not found'));
+    if (det) { var dq = orderQuad(det), oq = quad, near = dq.every(function (p, k) { return Math.abs(p.x - oq[k].x) < r.w * 0.12 && Math.abs(p.y - oq[k].y) < r.h * 0.12; }); if (near) { quad = dq; crumb('capture: snapped to plate corners'); } }
+    if (TEST) { $('cCrop').classList.remove('hide'); drawCrop(); }
+    if (keepOpen) return true;
+    readVG().then(function () { crumb('read done'); if (scan.lowRes) showErr('The camera gave a low-resolution picture — move a little closer, or use “Take photo” for this plate.'); });
+    return true;
+  }
+
+  // ---------- Step recorder: kept on the phone, so a crash can be traced after reopening ----------
+  function crumb(step) {
+    try { var c = JSON.parse(localStorage.getItem('ocrBenchCrumbs') || '[]'); c.push(new Date().toISOString().slice(11, 19) + ' ' + step); localStorage.setItem('ocrBenchCrumbs', JSON.stringify(c.slice(-25))); } catch (e) {}
+  }
+  function lastCrumbs() { try { return JSON.parse(localStorage.getItem('ocrBenchCrumbs') || '[]'); } catch (e) { return []; } }
+  window.addEventListener('error', function (e) { if (e && e.message) { crumb('ERROR ' + e.message); showErr('Something went wrong: ' + e.message + '. Use Take photo meanwhile.'); } });
+  window.addEventListener('unhandledrejection', function (e) { var m = e && e.reason && (e.reason.message || e.reason.name) || String(e && e.reason); crumb('ERROR ' + m); });
+
+  // ---------- Phone check: everything this page needs, with the fix for anything missing ----------
+  function envCheck() {
+    var ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var android = /Android/.test(ua), safari = ios && !/CriOS|FxiOS|EdgiOS/.test(ua), local = /^(file|content):/.test(location.protocol);
+    var items = [];
+    var add = function (ok, label, fix) { items.push({ ok: ok, label: label, fix: fix }); };
+    add(true, 'Browser: ' + (ios ? (safari ? 'Safari on iPhone' : 'iPhone browser (not Safari)') : android ? 'Chrome on Android' : 'Desktop'), '');
+    add(typeof WebAssembly === 'object', 'OCR engine can run', 'This browser cannot run the OCR engine — update the phone or use Chrome / Safari.');
+    add(typeof DecompressionStream !== 'undefined', 'OCR files can be unpacked', ios ? 'Needs iOS 16.4 or newer — update iOS.' : 'Update Chrome.');
+    add(typeof Worker !== 'undefined', 'Background reading', 'Update the browser.');
+    if (!document.getElementById('a-worker')) add(navigator.onLine !== false, 'Internet (first scan downloads the OCR engine, about 4 MB, once; cached after)', 'No internet — connect for the first scan.');
+    var cam = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && window.isSecureContext !== false;
+    add(cam, 'Live camera with outline', local ? 'Opened as a local file — the live outline camera may be blocked; Scan plate then uses the phone camera instead. For the outline camera, open the bench from a web (https) address.' : 'Live camera blocked — open the bench from an https address, or use “Take photo”.');
+    if (ios && local) add(false, 'Opened as a file on iPhone', 'Safari cannot run a local file properly — open the bench from a web (https) address.');
+    if (ios && !safari) add(true, 'Tip', 'On iPhone, Safari works best.');
+    if (ios) add(true, 'Tip', 'iPhone asks for camera permission each visit — tap Allow. To stop it: Settings › Safari › Camera › Allow.');
+    var cr = lastCrumbs(), endOk = !cr.length || /closed|read done|page opened/.test(cr[cr.length - 1]);
+    if (!endOk) add(false, 'Last time the page stopped at: “' + cr[cr.length - 1].slice(9) + '”', 'Tap “Copy diagnostics” below and send it to Claude.');
+    var box = $('envList'); box.textContent = '';
+    items.forEach(function (it) { var d = el('div', null, (it.ok ? '✓ ' : '✗ ') + it.label + (it.ok || !it.fix ? (it.label === 'Tip' ? ': ' + it.fix : '') : ' — ' + it.fix)); d.style.color = it.ok ? 'var(--ink)' : 'var(--bad)'; d.style.margin = '3px 0'; box.appendChild(d); });
+    if (!cam) $('bScan').textContent = 'Scan plate (phone camera)';
+    var bd = el('button', null, 'Copy diagnostics'); bd.type = 'button'; bd.style.minHeight = '36px'; bd.style.marginTop = '8px';
+    bd.onclick = function () { copy(JSON.stringify({ build: BUILD, ua: navigator.userAgent, mem: navigator.deviceMemory || null, url: location.protocol, secure: window.isSecureContext, steps: lastCrumbs() }, null, 1)); };
+    box.appendChild(bd);
+    crumb('page opened');
+    window.__env = { ios: ios, android: android, safari: safari, local: local, cam: cam, items: items };
+  }
+
+  // ---------- wiring ----------
+  // ---- Review step shared by Scan Nameplate and Upload Nameplate ----
+  // Only reliable values are offered; a box that already holds a different value changes only after OK; nothing is saved.
+  var np = { busy: false, seq: 0, url: '' };
+  var NPF = [['brand', 'fmBrand', 'Manufacturer'], ['model', 'fmModel', 'Model'], ['serial', 'fmSerial', 'Serial number'], ['partNo', 'fmPart', 'Part number'], ['year', 'fmYear', 'Year of manufacture']];
+  function npShow(o) {
+    $('npPanel').classList.remove('hide'); $('npPanel').classList.toggle('bad', !!o.bad);
+    if (o.img !== undefined) { $('npImg').classList.toggle('hide', !o.img); if (o.img) $('npImg').src = o.img; $('npNote').textContent = o.img ? 'Read on this phone. Check every value against the plate before saving.' : 'Scanned on this phone. Check every value against the plate before saving.'; $('npRepT').textContent = o.img ? 'Replace photo' : 'Upload a photo instead'; }
+    if (o.head !== undefined) { $('npHead').textContent = o.head; $('npHead').style.color = o.bad ? '#b91c1c' : o.busy ? '#6b645a' : '#1c1917'; }
+    if (o.rows) { var box = $('npRows'); box.innerHTML = ''; o.rows.forEach(function (r) { var d = document.createElement('div'); d.textContent = r.text; d.style.color = r.ink; box.appendChild(d); }); }
+  }
+  function applyPlate(F, plateFound, quiet) {
+    var read = {}, unsure = [], fill = {}, conflict = [], G = '#15803d', A = '#b45309', N = '#57534e', rows = [];
+    NPF.forEach(function (x) {
+      var k = x[0], f = F[k] || {}, v = String(f.value || '').trim();
+      if (k === 'year' && v && YEARS.indexOf(v) < 0) v = '';
+      if (f.status === 'ok' && v) read[k] = v; else unsure.push(k);
+    });
+    var same = function (a, b) { return String(a).trim().toUpperCase() === String(b).trim().toUpperCase(); };
+    Object.keys(read).forEach(function (k) { var el = $(NPF.filter(function (x) { return x[0] === k; })[0][1]), cur = String(el.value || '').trim(); if (!cur) fill[k] = read[k]; else if (!same(cur, read[k])) conflict.push(k); });
+    var replace = false;
+    if (conflict.length && !quiet) {
+      replace = window.confirm('The nameplate shows different values from what is already entered:\n\n' + conflict.map(function (k) { var x = NPF.filter(function (y) { return y[0] === k; })[0]; return x[2] + ': ' + $(x[1]).value + '  →  ' + read[k]; }).join('\n') + '\n\nOK = use the nameplate values\nCancel = keep what is entered');
+      if (replace) conflict.forEach(function (k) { fill[k] = read[k]; });
+    }
+    NPF.forEach(function (x) {
+      var k = x[0], el = $(x[1]), was = el.value, qr = k === 'serial' && F.serial && F.serial.qr ? ' (confirmed by the QR code)' : '';
+      if (fill[k] !== undefined) { el.value = fill[k]; el.classList.add('filled'); el.classList.remove('unsure'); rows.push({ text: '✓ ' + x[2] + ': ' + fill[k] + (conflict.indexOf(k) >= 0 ? ' — replaced, was ' + was : ' — filled in') + qr, ink: G }); }
+      else if (conflict.indexOf(k) >= 0) rows.push({ text: '• ' + x[2] + ': kept ' + was + ' (nameplate shows ' + read[k] + ') — check the plate', ink: A });
+      else if (read[k]) rows.push({ text: '✓ ' + x[2] + ': ' + read[k] + ' — same as entered' + qr, ink: G });
+      else if (!String(el.value || '').trim()) { el.classList.add('unsure'); if (el.tagName === 'INPUT') el.placeholder = 'Check the plate — type it'; rows.push({ text: '⚠ ' + x[2] + ': ' + (F[k] && F[k].status === 'check' ? 'not read reliably' : 'not found') + ' — check the plate and enter it', ink: A }); }
+    });
+    var n = Object.keys(read).length;
+    if (!n) rows.push({ text: 'Tip: hold the phone straight in front of the plate, fill the picture with it, avoid glare.', ink: N });
+    npShow({ bad: !n, rows: rows, head: !n ? (plateFound ? 'No values could be read reliably.' : 'No Vogelsang nameplate was recognised.') : conflict.length && !replace ? 'Some nameplate values differ from what is entered — check the plate.' : unsure.length ? 'Please check the values below and enter the missing ones.' : 'All values read — please check them against the plate.' });
+    window.__npLast = { read: read, fill: fill, conflict: conflict, replaced: replace, unsure: unsure };
+  }
+  function applyScan(acc, qrm, quiet) {
+    var F = {};
+    ['model', 'serial', 'partNo', 'year'].forEach(function (k) { F[k] = { value: acc[k] || '', status: acc[k] ? 'ok' : 'none', qr: k === 'serial' && !!acc.serial && qrm != null }; });
+    var vg = !!(acc.model || qrm != null); F.brand = { value: vg ? 'Vogelsang' : '', status: vg ? 'ok' : 'none' };
+    if (!quiet) { if (np.url) { try { URL.revokeObjectURL(np.url); } catch (e) {} np.url = ''; } npShow({ img: '' }); }
+    applyPlate(F, true, quiet); setQrTag(qrm);
+  }
+  async function uploadPhoto(e) {
+    var inp = e.target, file = inp.files && inp.files[0]; inp.value = '';
+    if (!file) return;
+    if (file.type && !/^image\//i.test(file.type)) { npShow({ img: '', bad: true, head: 'Please choose a photo (JPG or PNG).', rows: [] }); return; }
+    var seq = ++np.seq; if (np.url) { try { URL.revokeObjectURL(np.url); } catch (x) {} }
+    np.url = URL.createObjectURL(file); np.busy = true; $('bScan').disabled = true;
+    crumb('tap: Upload nameplate (' + (file.type || '?') + ', ' + Math.round(file.size / 1024) + ' KB)');
+    npShow({ img: np.url, busy: true, bad: false, head: 'Reading the nameplate on this phone…', rows: [] }); setQrTag(null);
+    try {
+      var r = await readPhoto(file);
+      if (seq !== np.seq) return;
+      np.busy = false; applyPlate(r.fields, r.plateFound, false);
+      window.__final = { values: r.fields, photo: true, ms: r.ms, tries: r.tries };
+    } catch (er) {
+      if (seq !== np.seq) return;
+      np.busy = false; npShow({ bad: true, head: String((er && er.message) || er), rows: [{ text: 'You can type the values by hand, or try again with another photo.', ink: '#57534e' }] });
+      window.__final = { error: String((er && er.message) || er) };
+    } finally { if (seq === np.seq) { np.busy = false; $('bScan').disabled = false; } }
+  }
+  $('fUp').onchange = uploadPhoto; $('fUp2').onchange = uploadPhoto;
+  // Once per phone, while online: store the OCR engine (about 5 MB) so both buttons work offline afterwards.
+  if (!EMBED && !PHOTO_EMBED) setTimeout(function () {
+    var c = navigator.connection; if (c && c.saveData) return;
+    packStatus().then(function (st) { if (!st.ok && st.cacheApi && navigator.onLine !== false) return packEnsure().then(function (r) { crumb('offline pack ' + JSON.stringify(r)); }); }).catch(function () {});
+  }, 15000);
+  $('bScan').onclick = function () { crumb('tap: Scan plate'); window.__final = null; openScanner().catch(function (e) { crumb('ERROR open ' + (e && e.message)); closeScanner(); showErr('The camera could not open: ' + (e && e.message || e) + '. Use Take photo.'); }); };
+  if (EMBED) setTimeout(function () { clearForm(); window.__final = null; openScanner().catch(function (e) { embedPost({ error: 'The camera could not open: ' + (e && e.message || e) }); closeScanner(); }); }, 30);
+  // ---- Photo mode (field app): one photo in, the nameplate values out. Nothing leaves the phone. ----
+  function photoCanvas(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, SRC_MAX / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        photoInfo = { name: file.name || '', bytes: file.size, type: file.type, origW: img.naturalWidth, origH: img.naturalHeight, workW: c.width, workH: c.height };
+        res(c);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error(/hei[cf]/i.test((file.type || '') + (file.name || '')) ? 'This photo is in HEIC format, which this browser cannot open. Choose a JPG or PNG, or take a new photo.' : 'This file could not be opened as a photo. Choose a JPG or PNG.')); };
+      img.src = url;
+    });
+  }
+  // QR as an anchor: on every Vogelsang plate the QR sits at the same place, so its 4 corners give the plate's
+  // position, size and rotation even when the plate edges cannot be found (dark pump, glare, plate small in the photo).
+  var QR_TPL = [{ x: 0.6011, y: 0.0745 }, { x: 0.8745, y: 0.0734 }, { x: 0.8749, y: 0.3915 }, { x: 0.6027, y: 0.3911 }];   // TL TR BR BL, measured on 13 plates
+  async function qrLocate(img) {
+    var nat = await qrNativeDetector(), lib = nat ? null : await qrLibLoad();
+    var sizes = [1200, 1800, 900];
+    for (var si = 0; si < sizes.length; si++) {
+      var k = Math.min(1, sizes[si] / Math.max(img.width, img.height)), w = Math.round(img.width * k), h = Math.round(img.height * k);
+      var c = document.createElement('canvas'); c.width = w; c.height = h; var g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, w, h);
+      var d = g.getImageData(0, 0, w, h).data, grey = new Uint8ClampedArray(w * h);
+      for (var i = 0, j = 0; i < grey.length; i++, j += 4) grey[i] = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000;
+      var base = { g: grey, w: w, h: h }, vars = [base, qrMedian(base), qrBlur(qrBlur(base))];
+      for (var vi = 0; vi < vars.length; vi++) {
+        var im = vars[vi], pts = null, sv = null;
+        if (nat) {
+          try { var cc = document.createElement('canvas'); cc.width = im.w; cc.height = im.h; cc.getContext('2d').putImageData(new ImageData(qrRGBA(im), im.w, im.h), 0, 0);
+            var rr = await nat.detect(cc); for (var q = 0; q < rr.length; q++) { var s1 = qrSerial(rr[q].rawValue); if (s1 && rr[q].cornerPoints && rr[q].cornerPoints.length === 4) { sv = s1; pts = rr[q].cornerPoints; break; } } } catch (e) { nat = null; lib = await qrLibLoad(); }
+        }
+        if (!sv && lib) { var r = lib(qrRGBA(im), im.w, im.h, { inversionAttempts: 'attemptBoth' }); var s2 = r && qrSerial(r.data); if (s2) { sv = s2; var L = r.location; pts = [L.topLeftCorner, L.topRightCorner, L.bottomRightCorner, L.bottomLeftCorner]; } }
+        if (sv) return { serial: sv, pts: pts.map(function (p) { return { x: p.x / k, y: p.y / k }; }), scale: sizes[si], variant: vi };
+      }
+    }
+    return null;
+  }
+  function quadFromQR(pts) { var H = homography(QR_TPL, pts); return [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }].map(function (p) { return apply(H, p.x, p.y); }); }
+  function photoFields(res) {
+    var out = {};
+    ['model', 'serial', 'partNo', 'year'].forEach(function (k) {
+      var f = (res && res[k]) || {}; out[k] = { value: f.value || '', status: f.value ? (f.status === 'ok' ? 'ok' : 'check') : 'none', qr: !!f.qr, match: f.match == null ? null : f.match };
+    });
+    return out;
+  }
+  async function readAt(q) {
+    quad = q; clearErr();
+    var r = await readVG({ silent: true, full: true, frameNo: 0 });
+    if (!r) throw new Error(String($('err').textContent || 'The nameplate could not be read.').replace(/^OCR failed: /, '').replace(/\nYou can still type the values manually\./, ''));
+    return photoFields(r);
+  }
+  async function readPhoto(file) {
+    var t0 = performance.now(), tries = [];
+    src = await photoCanvas(file); rot = 0; crop = null; quad = null; setMode('vg');
+    rotCache = rotated(); rotCache._rot = rot; rotCache._src = src;
+    var done = function (o) { return ['model', 'serial', 'partNo', 'year'].every(function (k) { return o[k].status === 'ok'; }); };
+    var found = detectPlate(), out = null, qloc = null;
+    if (found) { out = await readAt(found); tries.push('edges'); }
+    if (!out || !done(out)) {
+      qloc = await qrLocate(rotCache);
+      if (qloc) {
+        var a = Math.atan2(qloc.pts[1].y - qloc.pts[0].y, qloc.pts[1].x - qloc.pts[0].x) * 180 / Math.PI, turn = Math.round(a / 90) * 90;
+        if (turn) {   // plate photographed sideways / upside down: turn the photo upright, then find the QR again
+          rot = ((-turn % 360) + 360) % 360; rotCache = rotated(); rotCache._rot = rot; rotCache._src = src; qloc = await qrLocate(rotCache) || qloc;
+        }
+        var o2 = await readAt(quadFromQR(qloc.pts)); tries.push('qr');
+        if (!out) out = o2;
+        else ['model', 'serial', 'partNo', 'year'].forEach(function (k) {   // two readings: a value is kept only if they do not contradict
+          var A = out[k], B = o2[k];
+          if (A.status !== 'ok' && B.status === 'ok') out[k] = B;
+          else if (A.status === 'ok' && B.status === 'ok' && A.value !== B.value) out[k] = { value: A.value, status: 'check', qr: false, match: null };
+        });
+      }
+    }
+    if (!out) { out = await readAt(defaultQuad()); tries.push('centre'); }
+    if (qloc && qloc.serial) {   // the QR is error-checked: it decides the serial
+      var t = out.serial.value; out.serial = { value: qloc.serial, status: 'ok', qr: true, match: t ? t === qloc.serial : null };
+    }
+    var any = ['model', 'serial', 'partNo', 'year'].some(function (k) { return out[k].status === 'ok'; });
+    // Manufacturer: a catalogue Vogelsang model or a Vogelsang QR code identifies the plate.
+    // Other makers can be added later as further readers next to this one.
+    var vg = out.model.status === 'ok' || out.serial.qr;
+    out.brand = { value: vg ? 'Vogelsang' : '', status: vg ? 'ok' : 'none' };
+    crumb('photo(app): ' + tries.join('+') + ' ' + Math.round(performance.now() - t0) + ' ms');
+    return { fields: out, plateFound: !!(found || qloc), any: any, ms: Math.round(performance.now() - t0), tries: tries, reader: 'vogelsang-template' };
+  }
+  if (PHOTO_EMBED) {
+    var q = Promise.resolve();
+    window.addEventListener('message', function (e) {
+      var m = e.data; if (e.source !== window.parent || !m || !m.__apscanCmd) return;
+      var send = function (x) { x.__apscan = 1; x.id = m.id; x.build = BUILD; try { window.parent.postMessage(x, '*'); } catch (er) {} };
+      q = q.then(async function () {
+        try {
+          if (m.__apscanCmd === 'status') { var st = await packStatus(); st.kind = 'status'; send(st); }
+          else if (m.__apscanCmd === 'prepare') { var sp = await packEnsure(function (msg) { send({ kind: 'progress', msg: msg }); }); sp.kind = 'prepared'; send(sp); }
+          else if (m.__apscanCmd === 'read') { photoJob = { send: send }; var r = await readPhoto(m.file); r.kind = 'result'; send(r); }
+        } catch (er) { send({ kind: 'error', error: String((er && er.message) || er) }); }
+        finally { photoJob = null; }
+      });
+    });
+    try { window.parent.postMessage({ __apscan: 1, kind: 'ready', build: BUILD }, '*'); } catch (e) {}
+  }
+  $('bShot').onclick = function () {
+    if (!sess || TEST) return capture();
+    if ((sess.inflight || 0) >= 1 || running || !capture(true)) return;
+    if (!sess.t0) sess.t0 = Date.now();
+    sess.inflight = (sess.inflight || 0) + 1;
+    readVG({ silent: true }).then(function (res) {
+      sess.inflight--; mergeFrame(res || {});
+      FIELDS.forEach(function (k) { if (!sess.accepted[k] && res && res[k] && res[k].status === 'ok' && res[k].value) sess.accepted[k] = res[k].value; });
+      finishScan(FIELDS.every(function (k) { return sess.accepted[k]; }));
+    }, function () { sess.inflight--; });
+  };
+  $('bScanClose').onclick = function () { closeScanner(); };
+  $('bFlip').onclick = async function () { if (!scan.backs || scan.backs.length < 2) return; var i = scan.backs.indexOf(scan.deviceId), next = scan.backs[(i + 1) % scan.backs.length]; stopTracks(); $('bShot').disabled = true; try { scan.deviceId = next; await attachStream(await startStream(next)); } catch (e) { closeScanner(); showErr('Could not switch lens — tap Scan plate again.'); } };
+  $('bTorch').onclick = async function () { if (!scan.track) return; scan.torch = !scan.torch; try { await scan.track.applyConstraints({ advanced: [{ torch: scan.torch }] }); } catch (e) { scan.torch = false; } $('bTorch').style.background = scan.torch ? '#f59e0b' : 'rgba(0,0,0,.5)'; };
+  $('bNext').onclick = function () { $('bScan').onclick(); };
+  $('sMark').onchange = function () { document.body.classList.toggle('marking', $('sMark').checked); };
+  $('bCam').onclick = function () { autoRead = false; $('fCam').click(); };
+  $('bLib').onclick = function () { $('fLib').click(); };
+  $('fCam').onchange = $('fLib').onchange = function (e) { var f = (e.target.files || [])[0]; e.target.value = ''; loadFile(f); };
+  $('bRot').onclick = function () { rot = (rot + 90) % 360; crop = null; quad = null; drawCrop(); };
+  $('bReset').onclick = function () { crop = null; quad = null; drawCrop(); };
+  $('bRead').onclick = function () { return mode === 'vg' ? readVG() : read(); };
+  $('mVg').onclick = function () { setMode('vg'); };
+  $('mFree').onclick = function () { setMode('free'); };
+  $('bCancel').onclick = async function () { if (curJob) curJob.cancelled = true; await releaseWorker(); prog('Cancelled.', 0); setBusy(false); };
+  $('bRelease').onclick = async function () { await releaseWorker(); toast('OCR engine released'); };
+  $('bClearRuns').onclick = function () { runs.length = 0; $('nRuns').textContent = 0; try { localStorage.removeItem('ocrBenchRuns'); } catch (e) {} toast('Saved test results cleared'); };
+  window.addEventListener('pagehide', function () { stopTracks(); releaseWorker(); if (extra) { try { extra.terminate(); } catch (e) {} extra = null; } });
+  $('bUse').onclick = useValues;
+  $('bDiscard').onclick = function () { $('cReview').classList.add('hide'); toast('Discarded — nothing changed'); };
+  $('bCopy').onclick = function () { if (last) copy(JSON.stringify(snapshot(last), null, 1)); };
+  $('bCopyAll').onclick = function () { snapshot(last); copy(JSON.stringify(runs, null, 1)); };
+  function persistRuns() { try { localStorage.setItem('ocrBenchRuns', JSON.stringify(runs.slice(-60))); } catch (e) {} }
+  try { var keep = JSON.parse(localStorage.getItem('ocrBenchRuns') || '[]'); if (Array.isArray(keep) && keep.length) { keep.forEach(function (r) { runs.push(r); }); $('nRuns').textContent = runs.length; } } catch (e) {}
+  $('bSave').onclick = async function () {
+    snapshot(last); persistRuns();
+    var name = 'ocr-bench-results-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json', body = JSON.stringify(runs, null, 1);
+    try { // phone share sheet (Drive, WhatsApp, Files, AirDrop…) where supported
+      var file = new File([body], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'OCR bench results' }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    downloadRuns(name, body);
+  };
+  function downloadRuns(name, body) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'application/json' }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  };
+  envCheck();
+  window.__bench = { paint: paint, analyze: analyzeFrame, auto: auto, capture: capture, openScanner: openScanner, runs: runs, read: read, readVG: readVG, loadFile: loadFile, setCrop: function (c) { crop = c; drawCrop(); }, setQuad: function (q) { quad = q; drawCrop(); }, setMode: setMode, state: function () { return { last: last, crop: crop, rot: rot, quadNow: quad }; } };
+})();
+</script>
+</body>
+</html>
